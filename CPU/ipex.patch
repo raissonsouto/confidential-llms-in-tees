@@ -1,5 +1,5 @@
 diff --git a/examples/cpu/inference/python/llm/Dockerfile b/examples/cpu/inference/python/llm/Dockerfile
-index f0cb27c54..aaa8aa522 100644
+index f0cb27c54..1273796c0 100644
 --- a/examples/cpu/inference/python/llm/Dockerfile
 +++ b/examples/cpu/inference/python/llm/Dockerfile
 @@ -64,4 +64,5 @@ RUN . ./miniforge3/bin/activate && \
@@ -8,7 +8,7 @@ index f0cb27c54..aaa8aa522 100644
      sudo chown -R root:root /opt/oneCCL && \
 -    sed -i "s|ONECCL_PATH=.*|ONECCL_PATH=/opt/oneCCL|" ./tools/env_activate.sh
 +    sed -i "s|ONECCL_PATH=.*|ONECCL_PATH=/opt/oneCCL|" ./tools/env_activate.sh && \
-+    pip install "numpy<2.0.0"
++    pip install "numpy<2.0.0" "setuptools<81"
 diff --git a/examples/cpu/inference/python/llm/distributed/run_generation_with_deepspeed.py b/examples/cpu/inference/python/llm/distributed/run_generation_with_deepspeed.py
 index e214aa862..41c290f51 100644
 --- a/examples/cpu/inference/python/llm/distributed/run_generation_with_deepspeed.py
@@ -89,7 +89,7 @@ index 594e0cd3c..02be9b635 100644
 +            print()
 +        print("end token times")
 diff --git a/examples/cpu/inference/python/llm/tools/env_setup.sh b/examples/cpu/inference/python/llm/tools/env_setup.sh
-index 1c2497afd..37c9c6af8 100644
+index 1c2497afd..85a7dac7d 100644
 --- a/examples/cpu/inference/python/llm/tools/env_setup.sh
 +++ b/examples/cpu/inference/python/llm/tools/env_setup.sh
 @@ -81,7 +81,8 @@ if [ $((${MODE} & 0x02)) -ne 0 ]; then
@@ -102,3 +102,26 @@ index 1c2497afd..37c9c6af8 100644
  
      echo "#!/bin/bash" > ${AUX_INSTALL_SCRIPT}
      if [ $((${MODE} & 0x04)) -ne 0 ]; then
+@@ -95,9 +96,11 @@ if [ $((${MODE} & 0x02)) -ne 0 ]; then
+             exit 4
+         else
+             echo "python -m pip install torch==${VER_TORCH} --index-url https://download.pytorch.org/whl/cpu" >> ${AUX_INSTALL_SCRIPT}
+-            echo "python -m pip install intel-extension-for-pytorch==${VER_IPEX} oneccl-bind-pt==${VER_TORCHCCL} --extra-index-url https://pytorch-extension.intel.com/release-whl/stable/cpu/us/" >> ${AUX_INSTALL_SCRIPT}
++            echo "python -m pip install intel-extension-for-pytorch==${VER_IPEX%+cpu}" >> ${AUX_INSTALL_SCRIPT}
++            echo "python -m pip install oneccl-bind-pt==${VER_TORCHCCL} --extra-index-url https://pytorch-extension.intel.com/release-whl/stable/cpu/us/" >> ${AUX_INSTALL_SCRIPT}
+             python -m pip install torch==${VER_TORCH} --index-url https://download.pytorch.org/whl/cpu
+-            python -m pip install intel-extension-for-pytorch==${VER_IPEX} oneccl-bind-pt==${VER_TORCHCCL} --extra-index-url https://pytorch-extension.intel.com/release-whl/stable/cpu/us/
++            python -m pip install intel-extension-for-pytorch==${VER_IPEX%+cpu}
++            python -m pip install oneccl-bind-pt==${VER_TORCHCCL} --extra-index-url https://pytorch-extension.intel.com/release-whl/stable/cpu/us/
+         fi
+     else
+         function ver_compare() {
+@@ -214,7 +217,7 @@ if [ $((${MODE} & 0x01)) -ne 0 ]; then
+     if [ -f prompt.json ]; then
+         rm -f prompt.json
+     fi
+-    wget https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/prompt.json
++    wget https://raw.githubusercontent.com/intel/intel-extension-for-pytorch/xpu-main/examples/gpu/llm/inference/prompt.json
+     cd single_instance
+     if [ -f prompt.json ]; then
+         rm -f prompt.json
