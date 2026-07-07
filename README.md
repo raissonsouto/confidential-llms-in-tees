@@ -1,37 +1,88 @@
 # Confidential LLM inference benchmarking in CC
 
-Repository to include scripts to run inference benchmarks in CC environments.
+Repository to include scripts to run inference benchmarks in CC environments. Deploying the Azure VMs is covered in [AZURE.md](AZURE.md).
+
+## Table of contents
+
+- [Confidential LLM inference benchmarking in CC](#confidential-llm-inference-benchmarking-in-cc)
+  - [Table of contents](#table-of-contents)
+  - [Prerequisites](#prerequisites)
+  - [CPUs](#cpus)
+    - [Common Setup](#common-setup)
+      - [Hugging Face access token](#hugging-face-access-token)
+    - [SGX Setup](#sgx-setup)
+    - [TDX Setup](#tdx-setup)
+      - [Prepare a TDX VM image](#prepare-a-tdx-vm-image)
+      - [Copy the repository to the VM](#copy-the-repository-to-the-vm)
+      - [Enable hugepages](#enable-hugepages)
+    - [Running baseline experiments](#running-baseline-experiments)
+    - [Running TDX experiments](#running-tdx-experiments)
+    - [Running SGX experiments](#running-sgx-experiments)
+      - [Preparing the docker image for SGX](#preparing-the-docker-image-for-sgx)
+      - [Running SGX docker image for Benchmark](#running-sgx-docker-image-for-benchmark)
+    - [Quantizing models](#quantizing-models)
+    - [Processing Results](#processing-results)
+    - [Tracing](#tracing)
+  - [GPU](#gpu)
+  - [RAG](#rag)
 
 ## Prerequisites
 
 In our work we run on SPR or EMR Intel Xeon (generation 4 or older) CPUs and H100 GPUs. We used Ubuntu 24.04 as the host OS. Later Ubuntu versions should also work.
+
+**AMX is disabled on every CPU setup.** All CPU benchmark entry points cap the ISA ceiling below AMX (`ATEN_CPU_CAPABILITY=avx512_bf16` and `ONEDNN_MAX_CPU_ISA=AVX512_CORE_BF16`, set by `CPU/run.sh`, `RAG/run.sh`, and the SGX manifest — which additionally masks AMX from CPUID inside the enclave via `sgx.cpu_features.amx = "disabled"`). This keeps results comparable across CPU generations whether or not the host exposes AMX. It does not affect the GPU benchmarks.
 
 For benchmarks with SGX or TDX, please follow the respective sections on SGX or TDX setup.
 For GPU benchmarks, follow the GPU section.
 Finally, for RAG benchmarks, see the corresponding section. Note RAG currently only operates on CPUs.
 
 ## CPUs
+
 ### Common Setup
-To setup the host for running experiments, please first initalize the repository, by cloning it and applying appropriate patches:
+
+To setup the host for running experiments, please first initalize the repository, by cloning it and applying appropriate patches.
+
 ```sh
 git clone https://github.com/spcl/confidential-llms-in-tees.git
 cd confidential-llms-in-tees
+
+git checkout develop
 git submodule sync
 git submodule update --init --recursive
+
 cd CPU/tdx
 git apply ../tdx.patch
+
 cd ../intel-extension-for-pytorch
 git apply ../ipex.patch
+
 cd ..
 ```
-Then run the host setup script which will setup hugging face, create Docker, and build the necessary image:
+
+Then run the host setup script which will setup hugging face, create Docker, and build the necessary image. It reads `HUGGINGFACE_TOKEN` from `.env` at the repo root (`cp config.env .env` and fill it in), or you can pass the token inline:
+
 ```sh
-HUGGINGFACE_TOKEN=<token> ./host_setup.sh
+./host_setup.sh                            # token from .env
+HUGGINGFACE_TOKEN=<token> ./host_setup.sh  # or inline
 ```
-Relogin to apply changes in groups. Finally, compile the docker container:
+
+See [Hugging Face access token](#hugging-face-access-token) below for what permissions this token needs. Relogin to apply changes in groups. Finally, compile the docker container — the build context must be the `intel-extension-for-pytorch` directory itself, since its Dockerfile copies the context to `./intel-extension-for-pytorch` inside the image:
+
 ```sh
-DOCKER_BUILDKIT=1 docker build -f intel-extension-for-pytorch/examples/cpu/inference/python/llm/Dockerfile -t ipex-llm:2.3.100 .
+cd intel-extension-for-pytorch
+DOCKER_BUILDKIT=1 docker build -f examples/cpu/inference/python/llm/Dockerfile -t ipex-llm:2.3.100 .
+cd ..
 ```
+
+#### Hugging Face access token
+
+The benchmarks download gated models ([`meta-llama/Llama-2-7b-hf`](https://huggingface.co/meta-llama/Llama-2-7b-hf) — the one used by `run.sh`, [`Llama-2-13b-hf`](https://huggingface.co/meta-llama/Llama-2-13b-hf), [`Llama-2-70b-hf`](https://huggingface.co/meta-llama/Llama-2-70b-hf), and any Llama-3 variants you enable in `run.sh`). A token alone is not enough to pull these weights; you need both:
+
+1. **Repo access**: visit each gated model's page linked above while logged into the account that owns the token, and accept Meta's license/usage agreement. Access is granted per model, so repeat this for every Llama variant you plan to run. Without this, `huggingface-cli login` succeeds but the download fails with a 403 error.
+
+2. **Token permissions**: create the token at `https://huggingface.co/settings/tokens`.
+   - Classic tokens: the `read` role is sufficient (do not use `write`/`fine-grained-write`).
+   - Fine-grained tokens: enable "Read access to contents of all public gated repos you can access" under the "Repositories" permissions, or scope it explicitly to the model repos above.
 
 ### SGX Setup
 
@@ -74,9 +125,9 @@ SSH to the VM and run the host setup script:
 ```sh
 ssh -p 10022 tdx@localhost
 cd confidential-llms-in-tees
-HUGGINGFACE_TOKEN=<token> ./host_setup.sh
+./host_setup.sh   # reads HUGGINGFACE_TOKEN from .env, or pass it inline
 ```
-Relogin to apply changes in groups. Finally, compile the docker container:
+See [Hugging Face access token](#hugging-face-access-token) above for what permissions this token needs. Relogin to apply changes in groups. Finally, compile the docker container:
 ```sh
 cd confidential-llms-in-tees/intel-extension-for-pytorch/
 DOCKER_BUILDKIT=1 docker build -f examples/cpu/inference/python/llm/Dockerfile -t ipex-llm:2.3.100 .
@@ -150,7 +201,7 @@ source ./llm/tools/env_activate.sh
 
 Run a workload - preferably on a single socket:
 ```sh
-numactl -N 0,1 -m 0,1 -C 0-31 gramine-sgx LLM ~/llm/single_instance/run_generation.py --dtype bfloat16 -m meta-llama/Llama-2-7b-hf --input-tokens 1024 --max-new-tokens 128 --num-iter 30 --num-warmup 5 --batch-size 1 --greedy --benchmark
+numactl -N 0,1 -m 0,1 -C 0-31 gramine-sgx LLM ~/llm/single_instance/run_generation.py --dtype bfloat16 -m meta-llama/Llama-2-7b-hf --input-tokens 512 --max-new-tokens 128 --num-iter 30 --num-warmup 5 --batch-size 1 --greedy --benchmark
 ```
 
 ### Quantizing models
@@ -176,7 +227,7 @@ docker run --rm --privileged --shm-size=2gb -it -v /home/mchrapek/.cache:/home/u
 ```
 Inside run the inference command with `--profile`, e.g.:
 ```
-cd llm && source ../miniforge3/bin/activate && conda activate py310 && source tools/env_activate.sh && sudo chown -R 1000:1000 ~/.cache && deepspeed --bind_cores_to_rank --num_accelerators 1 --bind_core_list 0-59 distributed/run_generation_with_deepspeed.py --deployment-mode --benchmark -m meta-llama/Llama-2-7b-hf --ipex --batch-size 4 --num-iter 15 --num-warmup 5 --max-new-tokens 128 --input-tokens 128 --token-latency --greedy --profile
+export ATEN_CPU_CAPABILITY=avx512_bf16 ONEDNN_MAX_CPU_ISA=AVX512_CORE_BF16 && cd llm && source ../miniforge3/bin/activate && conda activate py310 && source tools/env_activate.sh && sudo chown -R 1000:1000 ~/.cache && deepspeed --bind_cores_to_rank --num_accelerators 1 --bind_core_list 0-59 distributed/run_generation_with_deepspeed.py --deployment-mode --benchmark -m meta-llama/Llama-2-7b-hf --ipex --dtype bfloat16 --batch-size 64 --num-iter 15 --num-warmup 5 --max-new-tokens 128 --input-tokens 128 --token-latency --greedy --profile
 ```
 This will generate log files which can be processed and plotted by `traces_parser.py`. It accepts two files with traces that correspond to two compared systems.
 
