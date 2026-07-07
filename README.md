@@ -86,16 +86,17 @@ The benchmarks download gated models ([`meta-llama/Llama-2-7b-hf`](https://huggi
 
 ### SGX Setup
 
-Please follow the script in ```sgx_setup.sh```. It installs the dependencies for Gramine and builds and installs Gramine.
+Gramine is **not** installed on the host: `sgx/Dockerfile.sgx` builds and installs it from the `gramine/` sources inside the SGX docker image, so `gramine-sgx` only exists inside that image (running it on the host gives `command not found`).
 
-Following the SGX setup should allow you to run the following hello world Gramine example.
+`sgx_setup.sh` automates the SGX preparation: it checks out ipex `release/2.2` and builds the `ipex-llm:2.2.0` base image (the SGX track runs on ipex 2.2, unlike the baseline/TDX track), builds the graminized `sgx-ipex-llm:2.2.0` image from `sgx/Dockerfile.sgx`, restores ipex to `release/2.3`, and finally quantizes the 7B/13B/70B models to INT8. **For the bf16-only experiment, skip the quantization part** (the 70B download alone needs well over 100 GB of disk): comment out the three `docker run ... quantization` lines at the end of the script before running it.
 
+To verify SGX works end to end, run the Gramine hello world **inside** the SGX image (note the directory is `CI-Examples`, plural):
+
+```sh
+docker run --rm --privileged -it sgx-ipex-llm:2.2.0 bash -c "cd gramine/CI-Examples/helloworld && make SGX=1 && gramine-sgx helloworld"
 ```
-cd gramine/CI-Example/helloworld
-make SGX=1
-gramine-sgx helloworld
-```
-In case you encounter errors related to Gramine, please refer to [its documentation](`https://gramine.readthedocs.io/en/stable/`) for debugging instructions.  
+
+In case you encounter errors related to Gramine, please refer to [its documentation](https://gramine.readthedocs.io/en/stable/) for debugging instructions.
 
 ### TDX Setup
 
@@ -189,11 +190,10 @@ nohup ./run.sh tdx &
 
 #### Preparing the docker image for SGX
 
-Requires image ipex-llm:2.3.100 to already exist. Create SGX/graminized version of the docker image
-by running:
+`sgx_setup.sh` already builds this image (see [SGX Setup](#sgx-setup)). To rebuild it manually: it requires the `ipex-llm:2.2.0` base image to already exist (`sgx/Dockerfile.sgx` is `FROM ipex-llm:2.2.0`, not the 2.3.100 image used by the baseline/TDX track), then:
 
 ```sh
-DOCKER_BUILDKIT=1 docker build -f sgx/Dockerfile.sgx -t sgx-ipex-llm:2.3.100 .
+DOCKER_BUILDKIT=1 docker build -f sgx/Dockerfile.sgx -t sgx-ipex-llm:2.2.0 .
 ```
 
 #### Running SGX docker image for Benchmark
