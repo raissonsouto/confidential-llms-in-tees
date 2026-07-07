@@ -86,25 +86,23 @@ The benchmarks download gated models ([`meta-llama/Llama-2-7b-hf`](https://huggi
 
 ### SGX Setup
 
-Gramine is **not** installed on the host: `sgx/Dockerfile.sgx` builds and installs it from the `gramine/` sources inside the SGX docker image, so `gramine-sgx` only exists inside that image (running it on the host gives `command not found`). There is nothing to install on the host beyond docker and the SGX devices (`ls /dev/sgx*` should show `sgx_enclave` and `sgx_provision` on an Azure DCsv3 VM).
+Gramine lives **inside** the SGX docker image (`sgx/Dockerfile.sgx` builds it from the `gramine/` sources), not on the host. The host only needs docker and the SGX devices (`ls /dev/sgx*`).
 
-`sgx_setup.sh` automates the whole SGX preparation. It checks out ipex `release/2.2` and applies `ipex-2.2.patch` (the SGX track runs on ipex 2.2, unlike the baseline/TDX track on 2.3), builds the `ipex-llm:2.2.0` base image, builds the graminized `sgx-ipex-llm:2.2.0` image from `sgx/Dockerfile.sgx` (compiles Gramine, generates a signing key, and signs the LLM manifest), restores ipex to `release/2.3`, and finally quantizes the 7B/13B/70B models to INT8.
-
-**For the bf16-only experiment, skip the quantization part** (the 70B download alone needs well over 100 GB of disk). From `CPU/`:
+`sgx_setup.sh` builds everything: the `ipex-llm:2.2.0` base image (the SGX track runs on ipex 2.2 with `ipex-2.2.patch`, unlike the baseline/TDX track on 2.3), then the graminized `sgx-ipex-llm:2.2.0`, and finally quantizes models to INT8 — **skip that part for the bf16-only experiment** (the 70B download alone needs over 100 GB). From `CPU/`:
 
 ```sh
-sed -i 's/^docker run/# docker run/' sgx_setup.sh   # comment out the INT8 quantization runs
-./sgx_setup.sh                                       # ~10-15 min for the two image builds
-git checkout -- sgx_setup.sh                         # undo the local edit so future pulls stay clean
+sed -i 's/^docker run/# docker run/' sgx_setup.sh   # skip INT8 quantization
+./sgx_setup.sh                                       # ~10-15 min
+git checkout -- sgx_setup.sh
 ```
 
-Then verify SGX works end to end by running the Gramine hello world **inside** the SGX image:
+Verify with the Gramine hello world inside the image:
 
 ```sh
 docker run --rm --privileged sgx-ipex-llm:2.2.0 bash -c "cd gramine/CI-Examples/helloworld && make SGX=1 && gramine-sgx helloworld"
 ```
 
-Expected output: enclave measurement details, a warning that `sgx.debug = true` is an insecure configuration (expected — the manifests are debug builds, fine for benchmarking), and finally `Hello, world`. In case of other Gramine errors, refer to [its documentation](https://gramine.readthedocs.io/en/stable/) for debugging instructions.
+It should print `Hello, world` after a `sgx.debug = true` warning (expected: debug manifests, fine for benchmarking). For other Gramine errors, see [its documentation](https://gramine.readthedocs.io/en/stable/).
 
 ### TDX Setup
 
