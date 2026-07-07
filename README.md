@@ -86,17 +86,25 @@ The benchmarks download gated models ([`meta-llama/Llama-2-7b-hf`](https://huggi
 
 ### SGX Setup
 
-Gramine is **not** installed on the host: `sgx/Dockerfile.sgx` builds and installs it from the `gramine/` sources inside the SGX docker image, so `gramine-sgx` only exists inside that image (running it on the host gives `command not found`).
+Gramine is **not** installed on the host: `sgx/Dockerfile.sgx` builds and installs it from the `gramine/` sources inside the SGX docker image, so `gramine-sgx` only exists inside that image (running it on the host gives `command not found`). There is nothing to install on the host beyond docker and the SGX devices (`ls /dev/sgx*` should show `sgx_enclave` and `sgx_provision` on an Azure DCsv3 VM).
 
-`sgx_setup.sh` automates the SGX preparation: it checks out ipex `release/2.2` and builds the `ipex-llm:2.2.0` base image (the SGX track runs on ipex 2.2, unlike the baseline/TDX track), builds the graminized `sgx-ipex-llm:2.2.0` image from `sgx/Dockerfile.sgx`, restores ipex to `release/2.3`, and finally quantizes the 7B/13B/70B models to INT8. **For the bf16-only experiment, skip the quantization part** (the 70B download alone needs well over 100 GB of disk): comment out the three `docker run ... quantization` lines at the end of the script before running it.
+`sgx_setup.sh` automates the whole SGX preparation. It checks out ipex `release/2.2` and applies `ipex-2.2.patch` (the SGX track runs on ipex 2.2, unlike the baseline/TDX track on 2.3), builds the `ipex-llm:2.2.0` base image, builds the graminized `sgx-ipex-llm:2.2.0` image from `sgx/Dockerfile.sgx` (compiles Gramine, generates a signing key, and signs the LLM manifest), restores ipex to `release/2.3`, and finally quantizes the 7B/13B/70B models to INT8.
 
-To verify SGX works end to end, run the Gramine hello world **inside** the SGX image (note the directory is `CI-Examples`, plural):
+**For the bf16-only experiment, skip the quantization part** (the 70B download alone needs well over 100 GB of disk). From `CPU/`:
 
 ```sh
-docker run --rm --privileged -it sgx-ipex-llm:2.2.0 bash -c "cd gramine/CI-Examples/helloworld && make SGX=1 && gramine-sgx helloworld"
+sed -i 's/^docker run/# docker run/' sgx_setup.sh   # comment out the INT8 quantization runs
+./sgx_setup.sh                                       # ~10-15 min for the two image builds
+git checkout -- sgx_setup.sh                         # undo the local edit so future pulls stay clean
 ```
 
-In case you encounter errors related to Gramine, please refer to [its documentation](https://gramine.readthedocs.io/en/stable/) for debugging instructions.
+Then verify SGX works end to end by running the Gramine hello world **inside** the SGX image:
+
+```sh
+docker run --rm --privileged sgx-ipex-llm:2.2.0 bash -c "cd gramine/CI-Examples/helloworld && make SGX=1 && gramine-sgx helloworld"
+```
+
+Expected output: enclave measurement details, a warning that `sgx.debug = true` is an insecure configuration (expected — the manifests are debug builds, fine for benchmarking), and finally `Hello, world`. In case of other Gramine errors, refer to [its documentation](https://gramine.readthedocs.io/en/stable/) for debugging instructions.
 
 ### TDX Setup
 
@@ -197,16 +205,30 @@ DOCKER_BUILDKIT=1 docker build -f sgx/Dockerfile.sgx -t sgx-ipex-llm:2.2.0 .
 ```
 
 #### Running SGX docker image for Benchmark
-Run the docker image and then before running a workload activate environment:
+
+Unlike the baseline/TDX arms, the SGX arm is not driven by `run.sh`: each configuration is one `gramine-sgx` invocation inside the `sgx-ipex-llm:2.2.0` container. The container mounts the host's `~/.cache`, so the Hugging Face login and the model weights from the baseline runs are reused (no new download or token setup).
+
+One configuration, end to end, capturing the output into a file `run_parser.py` can read (the filename encodes every CSV column, so keep the pattern `sgx-<in>in-<out>out-<n>vCPU-1s-<bs>bs-7b-bf16.txt`):
 
 ```sh
-source ./llm/tools/env_activate.sh
+d=results/$(date +"%F-%H-%M"); mkdir -p $d
+docker run --rm --privileged --shm-size=2gb -v $HOME/.cache:/home/ubuntu/.cache sgx-ipex-llm:2.2.0 bash -c "\
+  . ./miniconda3/bin/activate && conda activate py310 && \
+  source ./llm/tools/env_activate.sh && cd ~/sgx && \
+  numactl -m 0 -C 0-15 gramine-sgx LLM ~/llm/single_instance/run_generation.py \
+    --dtype bfloat16 -m meta-llama/Llama-2-7b-hf \
+    --input-tokens 128 --max-new-tokens 128 \
+    --num-iter 30 --num-warmup 10 --batch-size 1 --greedy --benchmark" \
+  &> $d/sgx-128in-128out-16vCPU-1s-1bs-7b-bf16.txt
 ```
 
-Run a workload - preferably on a single socket:
-```sh
-numactl -N 0,1 -m 0,1 -C 0-31 gramine-sgx LLM ~/llm/single_instance/run_generation.py --dtype bfloat16 -m meta-llama/Llama-2-7b-hf --input-tokens 512 --max-new-tokens 128 --num-iter 30 --num-warmup 5 --batch-size 1 --greedy --benchmark
-```
+Sweep the matrix by varying `--input-tokens` (128, 512, 2048) and `--batch-size` (1, 64), keeping the filename in sync. Match `run.sh`'s conventions: batch 1 uses `--greedy --num-warmup 10`; batch 64 drops `--greedy` and uses `--num-warmup 5`. Adjust `-C 0-15` to the machine's core list if not 16 vCPUs.
+
+Notes:
+
+- The first run takes several minutes before the first iteration prints: Gramine builds and measures a multi-GB enclave and loads the ~14 GB model through it. This is normal, not a hang.
+- The `sgx.debug = true` warning appears on every run and is expected.
+- Per-token latency will be visibly higher than the baseline on the same machine — that difference is the SGX overhead being measured.
 
 ### Quantizing models
 To quantize the models, follow `genQuantLLamaModels.sh`.
