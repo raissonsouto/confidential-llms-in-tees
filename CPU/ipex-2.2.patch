@@ -98,7 +98,7 @@ index a351bc7bf..599974a81 100644
 +            print()
 +        print("end token times")
 diff --git a/examples/cpu/inference/python/llm/tools/env_setup.sh b/examples/cpu/inference/python/llm/tools/env_setup.sh
-index 92112a009..9787a1cb4 100644
+index 92112a009..e57fea643 100644
 --- a/examples/cpu/inference/python/llm/tools/env_setup.sh
 +++ b/examples/cpu/inference/python/llm/tools/env_setup.sh
 @@ -83,7 +83,8 @@ if [ $((${MODE} & 0x02)) -ne 0 ]; then
@@ -136,3 +136,12 @@ index 92112a009..9787a1cb4 100644
      else
          if [ -d DeepSpeed ]; then
              rm -rf DeepSpeed
+@@ -232,7 +235,7 @@ if [ $((${MODE} & 0x01)) -ne 0 ]; then
+     if [ -f prompt.json ]; then
+         rm -f prompt.json
+     fi
+-    wget https://intel-extension-for-pytorch.s3.amazonaws.com/miscellaneous/llm/prompt.json
++    wget https://raw.githubusercontent.com/intel/intel-extension-for-pytorch/xpu-main/examples/gpu/llm/inference/prompt.json
+     cd single_instance
+     if [ -f prompt.json ]; then
+         rm -f prompt.json
