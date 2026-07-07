@@ -6,12 +6,16 @@ set -euxo pipefail
 # Assumes system runs on Ubuntu 23.10 with kernel 5.11 or later (requirement for upstream SGX kernel drivers)
 #  submodules initialized
 
-# Get ipex 2.2
+# Get ipex 2.2 (drop all local modifications first: ipex.patch touches more
+# files than the three benchmark scripts, and checkout refuses to switch
+# branches over them)
 cd intel-extension-for-pytorch/
-git checkout examples/cpu/inference/python/llm/distributed/run_generation_with_deepspeed.py examples/cpu/inference/python/llm/single_instance/run_generation.py examples/cpu/inference/python/llm/single_instance/run_quantization.py
+git checkout -- .
 git checkout release/2.2
 git submodule update --recursive --init
-git apply ../ipex.patch
+# ipex.patch is rebased on release/2.3 and no longer applies here; use the
+# 2.2-adapted copy (same toolchain fixes, generated against release/2.2)
+git apply ../ipex-2.2.patch
 cd -
 
 # build 2.2 ipex docker
@@ -22,7 +26,7 @@ DOCKER_BUILDKIT=1 docker build -f sgx/Dockerfile.sgx -t sgx-ipex-llm:2.2.0 .
 
 # Turn ipex back to 2.3
 cd intel-extension-for-pytorch/
-git checkout examples/cpu/inference/python/llm/distributed/run_generation_with_deepspeed.py examples/cpu/inference/python/llm/single_instance/run_generation.py examples/cpu/inference/python/llm/single_instance/run_quantization.py
+git checkout -- .
 git checkout release/2.3
 git submodule update --recursive --init
 git apply ../ipex.patch
