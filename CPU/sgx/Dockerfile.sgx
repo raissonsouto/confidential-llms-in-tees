@@ -11,7 +11,7 @@ RUN . ./miniconda3/bin/activate && conda activate py310 && \
     pip uninstall --no-input deepseed && \
     if [ ! -z ${HTTP_PROXY} ]; then echo "Acquire::http::Proxy \"${HTTP_PROXY}\";\n""Acquire::https::Proxy \"${HTTPS_PROXY}\";" | sudo tee /etc/apt/apt.conf.d/proxy.conf; fi && \
     sudo apt update && \
-    sudo apt upgrade && \
+    sudo apt upgrade -y && \
     sudo DEBIAN_FRONTEND=noninteractive apt install -y \
     make \
     build-essential \

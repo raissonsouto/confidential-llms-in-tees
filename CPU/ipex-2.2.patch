@@ -1,7 +1,16 @@
 diff --git a/examples/cpu/inference/python/llm/Dockerfile b/examples/cpu/inference/python/llm/Dockerfile
-index 41e29c42f..7758e684b 100644
+index 41e29c42f..1bb984965 100644
 --- a/examples/cpu/inference/python/llm/Dockerfile
 +++ b/examples/cpu/inference/python/llm/Dockerfile
+@@ -36,7 +36,7 @@ RUN useradd -m ubuntu && \
+ USER ubuntu
+ WORKDIR /home/ubuntu
+ 
+-RUN curl -fsSL -v -o miniconda.sh -O https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh  && \
++RUN curl -fsSL -v -o miniconda.sh -O https://github.com/conda-forge/miniforge/releases/download/24.1.2-0/Miniforge3-24.1.2-0-Linux-x86_64.sh  && \
+     bash miniconda.sh -b -p ./miniconda3 && \
+     rm miniconda.sh && \
+     echo "source ~/miniconda3/bin/activate" >> ./.bashrc
 @@ -64,4 +64,5 @@ RUN . ./miniconda3/bin/activate && \
      conda clean -a -y && \
      sudo mv ./oneCCL_release /opt/oneCCL && \
