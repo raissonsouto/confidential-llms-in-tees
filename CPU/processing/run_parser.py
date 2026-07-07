@@ -14,7 +14,7 @@ with open(f"./results.csv", 'w', newline='') as results:
 # Process each directory provided in the arguments
 for directory in sys.argv[1:]:
     # Process each .txt file found
-    for txt_file in glob.glob(f"./{directory}/**/*.txt"):
+    for txt_file in glob.glob(f"./{directory}/**/*.txt", recursive=True):
         with open(txt_file, 'r') as file:
             print(txt_file)
             lines = file.readlines()

@@ -90,8 +90,10 @@ echo "$1 stored in $directory" >> experiment.log
                             # log cmd
                             echo "${cmd[@]}" > $name.txt
 
-                            # run cmd
-                            "${cmd[@]}" &>> $name.txt
+                            # run cmd; do not let one failed config (e.g. an
+                            # OOM-killed docker run, exit 247) abort the whole
+                            # sweep under `set -e`
+                            "${cmd[@]}" &>> $name.txt || echo "FAILED $name (exit $?)"
 
                             # Finished run
                             echo "Finished $name"
