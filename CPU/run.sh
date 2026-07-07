@@ -10,8 +10,14 @@ config=$1
 # backend: ATen dispatch (valid values are avx2/avx512 only, avx512_bf16 is
 # silently ignored), the oneDNN JIT, and libxsmm (used by the IPEX TPP
 # kernels, which honor neither of the first two; cpx = Cooper Lake,
-# AVX512-BF16 without AMX).
-config_no_amx='export ATEN_CPU_CAPABILITY=avx512 ONEDNN_MAX_CPU_ISA=AVX512_CORE_BF16 LIBXSMM_TARGET=cpx'
+# AVX512-BF16 without AMX). LIBXSMM_TARGET is a hard target, not a ceiling:
+# on hosts without the cpx ISA (e.g. Ice Lake, no AVX512-BF16 instructions)
+# it makes libxsmm emit illegal instructions (SIGILL), so only set it where
+# there is AMX to suppress.
+config_no_amx='export ATEN_CPU_CAPABILITY=avx512 ONEDNN_MAX_CPU_ISA=AVX512_CORE_BF16'
+if grep -qw amx_tile /proc/cpuinfo; then
+    config_no_amx="$config_no_amx LIBXSMM_TARGET=cpx"
+fi
 
 config_num_iter=30
 config_num_warmup=10

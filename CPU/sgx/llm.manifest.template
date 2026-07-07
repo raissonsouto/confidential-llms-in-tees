@@ -17,11 +17,13 @@ loader.log_level = "{{ log_level }}"
 loader.env.LD_LIBRARY_PATH = "/lib:{{ arch_libdir }}:/usr/{{ arch_libdir }}"
 loader.env.HOME = "{{ env.HOME }}"
 loader.env.MALLOC_ARENA_MAX = "1"
-# Disable AMX on every setup: cap ATen dispatch, the oneDNN JIT, and libxsmm
-# (IPEX TPP kernels) below AMX (matches CPU/run.sh for the non-SGX systems).
+# Disable AMX on every setup: cap ATen dispatch and the oneDNN JIT below AMX
+# (matches CPU/run.sh for the non-SGX systems). No LIBXSMM_TARGET here: it is
+# a hard target that SIGILLs on hosts without the target ISA, and libxsmm's
+# own detection cannot see AMX anyway because sgx.cpu_features.amx below
+# masks it from CPUID inside the enclave.
 loader.env.ATEN_CPU_CAPABILITY = "avx512"
 loader.env.ONEDNN_MAX_CPU_ISA = "AVX512_CORE_BF16"
-loader.env.LIBXSMM_TARGET = "cpx"
 
 loader.insecure__use_cmdline_argv = true
 loader.insecure__use_host_env = true
