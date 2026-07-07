@@ -5,10 +5,13 @@ set -euxo pipefail
 
 config=$1
 
-# Disable AMX on every setup: cap the ATen/IPEX dispatch and the oneDNN JIT at
-# the AVX512-BF16 ISA level so results are comparable across CPU generations
-# regardless of whether the host exposes AMX.
-config_no_amx='export ATEN_CPU_CAPABILITY=avx512_bf16 ONEDNN_MAX_CPU_ISA=AVX512_CORE_BF16'
+# Disable AMX on every setup so results are comparable across CPU generations
+# regardless of whether the host exposes AMX. Three knobs, one per kernel
+# backend: ATen dispatch (valid values are avx2/avx512 only, avx512_bf16 is
+# silently ignored), the oneDNN JIT, and libxsmm (used by the IPEX TPP
+# kernels, which honor neither of the first two; cpx = Cooper Lake,
+# AVX512-BF16 without AMX).
+config_no_amx='export ATEN_CPU_CAPABILITY=avx512 ONEDNN_MAX_CPU_ISA=AVX512_CORE_BF16 LIBXSMM_TARGET=cpx'
 
 config_num_iter=30
 config_num_warmup=10
@@ -31,7 +34,7 @@ echo "$1 stored in $directory" >> experiment.log
     numactl --hardware &> $directory/numactl-hw.out
 
     # initialize variables with different values
-    for vCPUs in '1' '1-2' '1-4' '1-8' '1-16' '1-32' '1-48' '0-59'; do # if you want to use all cores available to the system just leave empty ''; if you want to use cores accross sockets, you can use `--num_accelerators 2` in the main command
+    for vCPUs in '0-15'; do # all 16 vCPUs of the Azure VMs; leave empty '' to use every core available to the system
         for batch_size in 1 64; do
             for in_token in 128 512 2048; do
                 for out_token in 128; do
@@ -43,11 +46,14 @@ echo "$1 stored in $directory" >> experiment.log
                             name=$directory/$1
                             name=$name-${in_token}in
                             name=$name-${out_token}out
+                            # do not overwrite the loop variable: the outer
+                            # vCPUs loop reuses it on the next inner iteration
                             if [[ -n ${vCPUs//[[:space:]]/} ]]; then
                                 vCPUs_num=$(awk -F- '{print (NF==1)?$1:($2-$1+1)}' <<< "$vCPUs")
-                                vCPUs="--bind_core_list $vCPUs"
+                                bind_arg="--bind_core_list $vCPUs"
                             else
                                 vCPUs_num=$config_procs
+                                bind_arg=''
                             fi
                             name=$name-${vCPUs_num}vCPU
                             if (( vCPUs_num > config_socket )); then
@@ -73,7 +79,7 @@ echo "$1 stored in $directory" >> experiment.log
                             fi
 
                             cmd=(docker run --rm --privileged --shm-size="2gb" -v $HOME/.cache:/home/ubuntu/.cache ipex-llm:2.3.100 bash -c \
-                                "$config_no_amx && cd llm && source ../miniforge3/bin/activate && conda activate py310 && source tools/env_activate.sh && sudo chown -R 1000:1000 ~/.cache && deepspeed --bind_cores_to_rank $vCPUs distributed/run_generation_with_deepspeed.py --deployment-mode --profile --benchmark -m $model $quant --ipex --dtype bfloat16 --batch-size $batch_size --num-iter $num_iter --num-warmup $num_warmup --max-new-tokens $out_token --input-tokens $in_token --token-latency $greedy" )
+                                "$config_no_amx && cd llm && source ../miniforge3/bin/activate && conda activate py310 && source tools/env_activate.sh && sudo chown -R 1000:1000 ~/.cache && deepspeed --bind_cores_to_rank $bind_arg distributed/run_generation_with_deepspeed.py --deployment-mode --profile --benchmark -m $model $quant --ipex --dtype bfloat16 --batch-size $batch_size --num-iter $num_iter --num-warmup $num_warmup --max-new-tokens $out_token --input-tokens $in_token --token-latency $greedy" )
 
                             # log cmd
                             echo "${cmd[@]}" > $name.txt
@@ -82,8 +88,7 @@ echo "$1 stored in $directory" >> experiment.log
                             "${cmd[@]}" &>> $name.txt
 
                             # Finished run
-                            echo "Finished"
-                            exit 0
+                            echo "Finished $name"
                         done
                     done
                 done

@@ -30,8 +30,6 @@ Repository to include scripts to run inference benchmarks in CC environments. De
 
 In our work we run on SPR or EMR Intel Xeon (generation 4 or older) CPUs and H100 GPUs. We used Ubuntu 24.04 as the host OS. Later Ubuntu versions should also work.
 
-**AMX is disabled on every CPU setup.** All CPU benchmark entry points cap the ISA ceiling below AMX (`ATEN_CPU_CAPABILITY=avx512_bf16` and `ONEDNN_MAX_CPU_ISA=AVX512_CORE_BF16`, set by `CPU/run.sh`, `RAG/run.sh`, and the SGX manifest — which additionally masks AMX from CPUID inside the enclave via `sgx.cpu_features.amx = "disabled"`). This keeps results comparable across CPU generations whether or not the host exposes AMX. It does not affect the GPU benchmarks.
-
 For benchmarks with SGX or TDX, please follow the respective sections on SGX or TDX setup.
 For GPU benchmarks, follow the GPU section.
 Finally, for RAG benchmarks, see the corresponding section. Note RAG currently only operates on CPUs.
@@ -43,7 +41,7 @@ Finally, for RAG benchmarks, see the corresponding section. Note RAG currently o
 To setup the host for running experiments, please first initalize the repository, by cloning it and applying appropriate patches.
 
 ```sh
-git clone https://github.com/spcl/confidential-llms-in-tees.git
+git clone https://github.com/raissonsouto/confidential-llms-in-tees.git
 cd confidential-llms-in-tees
 
 git checkout develop
@@ -70,6 +68,8 @@ See [Hugging Face access token](#hugging-face-access-token) below for what permi
 
 ```sh
 cd intel-extension-for-pytorch
+
+# ~10min
 DOCKER_BUILDKIT=1 docker build -f examples/cpu/inference/python/llm/Dockerfile -t ipex-llm:2.3.100 .
 cd ..
 ```
@@ -98,6 +98,10 @@ gramine-sgx helloworld
 In case you encounter errors related to Gramine, please refer to [its documentation](`https://gramine.readthedocs.io/en/stable/`) for debugging instructions.  
 
 ### TDX Setup
+
+> [!NOTE]
+> **On-prem only.** This whole section builds and boots a TD guest on your own TDX host. On a CSP machine (e.g., the Azure `DC16es_v6` Confidential VM), the VM is already a TDX guest: skip to [Running TDX experiments](#running-tdx-experiments).
+
 #### Prepare a TDX VM image
 Use TDX guest tools to generate a TDX VM image. By default, we create a 300GB image but it should be at least 200GB (required for 70B Llama2 model). For more in depth treatment such as BIOS configuration for TDX, follow the instructions within the [Ubuntu's TDX](https://github.com/canonical/tdx) repository. In short, run:
 ```sh
@@ -170,9 +174,9 @@ nohup ./run.sh baseline &
 This will generate a folder under `results/` with the current date and time and add an entry into the experiment log. All generated files will have the form `baseline-system-in_size-out_size-vCPUs-numa-batch_size-model-data_type.txt`.
 
 ### Running TDX experiments
-SSH to the running TDX VM as created above.
+SSH to the TDX machine. On Azure that is the `DC16es_v6` VM (`ssh azureuser@<tdx-vm-ip>`); on-prem it is the TD guest created in [TDX Setup](#tdx-setup):
 ```sh
-ssh -P 10022 root@localhost
+ssh -p 10022 tdx@localhost   # on-prem TD guest only
 ```
 
 Run the experiments via:
@@ -209,16 +213,19 @@ To quantize the models, follow `genQuantLLamaModels.sh`.
 
 ### Processing Results
 
-`run_parser.py` gathers all token latencies from each experiments and places
-them into a csv file. It requires a single argument for the results folder to
-look in for results files. Any file ending in `.txt` is considered a result
-file.
+`processing/run_parser.py` gathers all iteration and token latencies from each
+experiment and places them into a csv file. Pass it the **parent** `results`
+directory (its glob only matches `.txt` files one level below the argument, so
+passing a single `results/<date>-<time>` folder matches nothing). Run it from
+`CPU/`:
 
 ```sh
-python parse_results.py results/<date>-<time>
+python3 processing/run_parser.py results
 ```
 
-The resulting CSV file will be stored in `results/<date>-<time>`. These can be parsed by some of the plotting helper functions we provide in `/processing`.
+The output is written to `./results.csv` in the current directory and is
+**overwritten on every run**, so copy it elsewhere before re-parsing. The CSV
+can then be plotted with the helper functions in `processing/`.
 
 ### Tracing
 To obtain traces, start the Docker container:
@@ -227,7 +234,7 @@ docker run --rm --privileged --shm-size=2gb -it -v /home/mchrapek/.cache:/home/u
 ```
 Inside run the inference command with `--profile`, e.g.:
 ```
-export ATEN_CPU_CAPABILITY=avx512_bf16 ONEDNN_MAX_CPU_ISA=AVX512_CORE_BF16 && cd llm && source ../miniforge3/bin/activate && conda activate py310 && source tools/env_activate.sh && sudo chown -R 1000:1000 ~/.cache && deepspeed --bind_cores_to_rank --num_accelerators 1 --bind_core_list 0-59 distributed/run_generation_with_deepspeed.py --deployment-mode --benchmark -m meta-llama/Llama-2-7b-hf --ipex --dtype bfloat16 --batch-size 64 --num-iter 15 --num-warmup 5 --max-new-tokens 128 --input-tokens 128 --token-latency --greedy --profile
+export ATEN_CPU_CAPABILITY=avx512 ONEDNN_MAX_CPU_ISA=AVX512_CORE_BF16 LIBXSMM_TARGET=cpx && cd llm && source ../miniforge3/bin/activate && conda activate py310 && source tools/env_activate.sh && sudo chown -R 1000:1000 ~/.cache && deepspeed --bind_cores_to_rank --num_accelerators 1 --bind_core_list 0-59 distributed/run_generation_with_deepspeed.py --deployment-mode --benchmark -m meta-llama/Llama-2-7b-hf --ipex --dtype bfloat16 --batch-size 64 --num-iter 15 --num-warmup 5 --max-new-tokens 128 --input-tokens 128 --token-latency --greedy --profile
 ```
 This will generate log files which can be processed and plotted by `traces_parser.py`. It accepts two files with traces that correspond to two compared systems.
 
