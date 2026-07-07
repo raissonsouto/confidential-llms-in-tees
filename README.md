@@ -204,7 +204,10 @@ DOCKER_BUILDKIT=1 docker build -f sgx/Dockerfile.sgx -t sgx-ipex-llm:2.2.0 .
 
 #### Running SGX docker image for Benchmark
 
-Unlike the baseline/TDX arms, the SGX arm is not driven by `run.sh`: each configuration is one `gramine-sgx` invocation inside the `sgx-ipex-llm:2.2.0` container. The container mounts the host's `~/.cache`, so the Hugging Face login and the model weights from the baseline runs are reused (no new download or token setup).
+Unlike the baseline/TDX arms, the SGX arm is not driven by `run.sh`: each configuration is one `gramine-sgx` invocation inside the `sgx-ipex-llm:2.2.0` container.
+
+> [!IMPORTANT]
+> **Run the baseline sweep on this machine first.** The Gramine enclave has no network access (DNS resolution fails inside it), so the model can only be loaded offline from the mounted `~/.cache` — which the baseline run populates. With an empty cache the SGX run dies with `Couldn't connect to huggingface.co ... couldn't find it in the cached files`. The failed HEAD requests to huggingface.co at startup are normal; with a populated cache transformers falls back to the local files.
 
 One configuration, end to end, capturing the output into a file `run_parser.py` can read (the filename encodes every CSV column, so keep the pattern `sgx-<in>in-<out>out-<n>vCPU-1s-<bs>bs-7b-bf16.txt`):
 
@@ -214,11 +217,14 @@ docker run --rm --privileged --shm-size=2gb -v $HOME/.cache:/home/ubuntu/.cache 
   . ./miniconda3/bin/activate && conda activate py310 && \
   source ./llm/tools/env_activate.sh && cd ~/sgx && \
   numactl -m 0 -C 0-15 gramine-sgx LLM ~/llm/single_instance/run_generation.py \
-    --dtype bfloat16 -m meta-llama/Llama-2-7b-hf \
+    --ipex --token-latency --dtype bfloat16 -m meta-llama/Llama-2-7b-hf \
     --input-tokens 128 --max-new-tokens 128 \
     --num-iter 30 --num-warmup 10 --batch-size 1 --greedy --benchmark" \
   &> $d/sgx-128in-128out-16vCPU-1s-1bs-7b-bf16.txt
 ```
+
+> [!IMPORTANT]
+> Do not drop `--ipex --token-latency`. Unlike the deepspeed script, `run_generation.py` applies IPEX optimization only when `--ipex` is passed — without it the run measures vanilla-transformers inference, which is not comparable to the baseline/TDX arms (and uses far more memory: full attention matrices instead of IPEX's fused path). `--token-latency` (which requires `--ipex`) emits the per-token latency lists that `run_parser.py` and the latency analysis need.
 
 Sweep the matrix by varying `--input-tokens` (128, 512, 2048) and `--batch-size` (1, 64), keeping the filename in sync. Match `run.sh`'s conventions: batch 1 uses `--greedy --num-warmup 10`; batch 64 drops `--greedy` and uses `--num-warmup 5`. Adjust `-C 0-15` to the machine's core list if not 16 vCPUs.
 
@@ -227,6 +233,7 @@ Notes:
 - The first run takes several minutes before the first iteration prints: Gramine builds and measures a multi-GB enclave and loads the ~14 GB model through it. This is normal, not a hang.
 - The `sgx.debug = true` warning appears on every run and is expected.
 - Per-token latency will be visibly higher than the baseline on the same machine — that difference is the SGX overhead being measured.
+- Batch-64 configurations can fail with `DefaultCPUAllocator: can't allocate memory` **inside the enclave**: `llm.manifest.template` sets `sgx.enclave_size = "64G"` (sized to the EPC), and at batch 64 the benchmark defaults to 4-beam search, so KV cache and prefill activations can exceed it. Raising `sgx.enclave_size` past the EPC and rebuilding the image makes Gramine rely on kernel EPC paging — the run may then complete, but with a heavy, measurable slowdown.
 
 ### Quantizing models
 To quantize the models, follow `genQuantLLamaModels.sh`.
@@ -234,10 +241,9 @@ To quantize the models, follow `genQuantLLamaModels.sh`.
 ### Processing Results
 
 `processing/run_parser.py` gathers all iteration and token latencies from each
-experiment and places them into a csv file. Pass it the **parent** `results`
-directory (its glob only matches `.txt` files one level below the argument, so
-passing a single `results/<date>-<time>` folder matches nothing). Run it from
-`CPU/`:
+experiment and places them into a csv file. Its glob is recursive, so it accepts
+either the parent `results` directory or a single `results/<date>-<time>` folder.
+Run it from `CPU/`:
 
 ```sh
 python3 processing/run_parser.py results
