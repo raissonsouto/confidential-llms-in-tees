@@ -1,15 +1,15 @@
 # Confidential LLM inference benchmarking in CC
 
-Repository to include scripts to run inference benchmarks in CC environments. Deploying the Azure VMs is covered in [AZURE.md](AZURE.md).
+Repository to include scripts to run inference benchmarks in CC environments.
 
 ## Table of contents
 
 - [Confidential LLM inference benchmarking in CC](#confidential-llm-inference-benchmarking-in-cc)
   - [Table of contents](#table-of-contents)
   - [Prerequisites](#prerequisites)
+    - [Hugging Face access token](#hugging-face-access-token)
   - [CPUs](#cpus)
     - [Common Setup](#common-setup)
-      - [Hugging Face access token](#hugging-face-access-token)
     - [SGX Setup](#sgx-setup)
     - [TDX Setup](#tdx-setup)
       - [Prepare a TDX VM image](#prepare-a-tdx-vm-image)
@@ -23,16 +23,27 @@ Repository to include scripts to run inference benchmarks in CC environments. De
     - [Quantizing models](#quantizing-models)
     - [Processing Results](#processing-results)
     - [Tracing](#tracing)
-  - [GPU](#gpu)
-  - [RAG](#rag)
 
 ## Prerequisites
 
-In our work we run on SPR or EMR Intel Xeon (generation 4 or older) CPUs and H100 GPUs. We used Ubuntu 24.04 as the host OS. Later Ubuntu versions should also work.
+This reproduction runs the CPU TEE arms only, on two Azure Intel-based
+confidential-computing VMs: `Standard_DC16s_v3` (Ice Lake, DCsv3 family) hosts
+the baseline and SGX arms, and `Standard_DC16es_v6` (Emerald Rapids, DCesv6
+family) hosts the TDX arm. Both run Ubuntu 24.04 LTS. Deploying those VMs is
+covered in [AZURE.md](AZURE.md).
 
-For benchmarks with SGX or TDX, please follow the respective sections on SGX or TDX setup.
-For GPU benchmarks, follow the GPU section.
-Finally, for RAG benchmarks, see the corresponding section. Note RAG currently only operates on CPUs.
+For SGX or TDX benchmarks, follow the respective sections on SGX or TDX
+setup below. All benchmarks use Llama2 7B in bfloat16.
+
+### Hugging Face access token
+
+The benchmarks download gated models ([`meta-llama/Llama-2-7b-hf`](https://huggingface.co/meta-llama/Llama-2-7b-hf) — the one used by `run.sh`, [`Llama-2-13b-hf`](https://huggingface.co/meta-llama/Llama-2-13b-hf), [`Llama-2-70b-hf`](https://huggingface.co/meta-llama/Llama-2-70b-hf), and any Llama-3 variants you enable in `run.sh`). A token alone is not enough to pull these weights; you need both:
+
+1. **Repo access**: visit each gated model's page linked above while logged into the account that owns the token, and accept Meta's license/usage agreement. Access is granted per model, so repeat this for every Llama variant you plan to run. Without this, `huggingface-cli login` succeeds but the download fails with a 403 error.
+
+2. **Token permissions**: create the token at `https://huggingface.co/settings/tokens`.
+   - Classic tokens: the `read` role is sufficient (do not use `write`/`fine-grained-write`).
+   - Fine-grained tokens: enable "Read access to contents of all public gated repos you can access" under the "Repositories" permissions, or scope it explicitly to the model repos above.
 
 ## CPUs
 
@@ -64,7 +75,7 @@ Then run the host setup script which will setup hugging face, create Docker, and
 HUGGINGFACE_TOKEN=<token> ./host_setup.sh  # or inline
 ```
 
-See [Hugging Face access token](#hugging-face-access-token) below for what permissions this token needs. Relogin to apply changes in groups. Finally, compile the docker container — the build context must be the `intel-extension-for-pytorch` directory itself, since its Dockerfile copies the context to `./intel-extension-for-pytorch` inside the image:
+See [Hugging Face access token](#hugging-face-access-token) in Prerequisites for what permissions this token needs. Relogin to apply changes in groups. Finally, compile the docker container — the build context must be the `intel-extension-for-pytorch` directory itself, since its Dockerfile copies the context to `./intel-extension-for-pytorch` inside the image:
 
 ```sh
 cd intel-extension-for-pytorch
@@ -73,16 +84,6 @@ cd intel-extension-for-pytorch
 DOCKER_BUILDKIT=1 docker build -f examples/cpu/inference/python/llm/Dockerfile -t ipex-llm:2.3.100 .
 cd ..
 ```
-
-#### Hugging Face access token
-
-The benchmarks download gated models ([`meta-llama/Llama-2-7b-hf`](https://huggingface.co/meta-llama/Llama-2-7b-hf) — the one used by `run.sh`, [`Llama-2-13b-hf`](https://huggingface.co/meta-llama/Llama-2-13b-hf), [`Llama-2-70b-hf`](https://huggingface.co/meta-llama/Llama-2-70b-hf), and any Llama-3 variants you enable in `run.sh`). A token alone is not enough to pull these weights; you need both:
-
-1. **Repo access**: visit each gated model's page linked above while logged into the account that owns the token, and accept Meta's license/usage agreement. Access is granted per model, so repeat this for every Llama variant you plan to run. Without this, `huggingface-cli login` succeeds but the download fails with a 403 error.
-
-2. **Token permissions**: create the token at `https://huggingface.co/settings/tokens`.
-   - Classic tokens: the `read` role is sufficient (do not use `write`/`fine-grained-write`).
-   - Fine-grained tokens: enable "Read access to contents of all public gated repos you can access" under the "Repositories" permissions, or scope it explicitly to the model repos above.
 
 ### SGX Setup
 
@@ -138,7 +139,7 @@ ssh -p 10022 tdx@localhost
 cd confidential-llms-in-tees
 ./host_setup.sh   # reads HUGGINGFACE_TOKEN from .env, or pass it inline
 ```
-See [Hugging Face access token](#hugging-face-access-token) above for what permissions this token needs. Relogin to apply changes in groups. Finally, compile the docker container:
+See [Hugging Face access token](#hugging-face-access-token) in Prerequisites for what permissions this token needs. Relogin to apply changes in groups. Finally, compile the docker container:
 ```sh
 cd confidential-llms-in-tees/intel-extension-for-pytorch/
 DOCKER_BUILDKIT=1 docker build -f examples/cpu/inference/python/llm/Dockerfile -t ipex-llm:2.3.100 .
@@ -263,31 +264,3 @@ Inside run the inference command with `--profile`, e.g.:
 export ATEN_CPU_CAPABILITY=avx512 ONEDNN_MAX_CPU_ISA=AVX512_CORE_BF16 LIBXSMM_TARGET=cpx && cd llm && source ../miniforge3/bin/activate && conda activate py310 && source tools/env_activate.sh && sudo chown -R 1000:1000 ~/.cache && deepspeed --bind_cores_to_rank --num_accelerators 1 --bind_core_list 0-59 distributed/run_generation_with_deepspeed.py --deployment-mode --benchmark -m meta-llama/Llama-2-7b-hf --ipex --dtype bfloat16 --batch-size 64 --num-iter 15 --num-warmup 5 --max-new-tokens 128 --input-tokens 128 --token-latency --greedy --profile
 ```
 This will generate log files which can be processed and plotted by `traces_parser.py`. It accepts two files with traces that correspond to two compared systems.
-
-## GPU
-GPUs require vLLM. Follow (their installation instructions)[https://github.com/vllm-project/vllm] to enable them on your system.
-You can then run the benchmark using:
-```
-./benchmark_vllm.sh
-```
-You can parse the produced logs using `parse.py` and plot using `plot_GPUs.py` (modify inside the names of your CSVs).
-
-## RAG
-Make sure you have your submodules initialized. Then, enter the RAG directory and apply the patch:
-```
-cd RAG/beir
-git apply ../beir.patch
-```
-Start the elasticsearch database:
-```
-cd RAG
-docker compose up elasticsearch
-```
-To build and run the benchmarks container:
-```
-docker compose run --rm --build rag
-```
-Within just run:
-```
-./run.sh
-```
