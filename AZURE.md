@@ -39,15 +39,12 @@ the actual benchmark setup and execution is covered in the main
 > instead encrypts the entire VM and cannot be disabled from inside, so the
 > TDX machine cannot host a native run.
 
-The memory gap (a consequence of each family's fixed vCPU-to-memory ratio:
-1:8 for DCsv3, 1:4 for DCesv6) doesn't affect the batch-1 measurements:
-Llama-2-7B in bf16 (~14 GB) fits comfortably in both VMs and in the SGX EPC
-(64 GiB), avoiding EPC paging. At batch size 64, however, memory becomes the
-binding constraint: 512-token inputs exceed the TDX VM's 64 GiB, and
-2048-token inputs exceed even the 128 GiB machine — both runs are killed by
-the kernel OOM killer. Since the VMs are different hardware generations, the
-comparable quantity is each machine's TEE-vs-native ratio, not absolute
-latencies. All runs use bfloat16 and the same `run.sh`.
+The memory gap doesn't affect batch-1 (Llama-2-7B in bf16, ~14 GB, fits both
+VMs and the SGX EPC), but at batch 64 it's the binding constraint: 512-token
+inputs OOM-kill on the TDX VM's 64 GiB, and 2048-token inputs OOM-kill even
+on the 128 GiB machine. The comparable quantity is each machine's
+TEE-vs-native ratio, not absolute latencies, since the VMs are different
+hardware generations. All runs use bfloat16 and the same `run.sh`.
 
 ## Prerequisites
 
@@ -123,8 +120,9 @@ Quota increases don't bill anything on their own, so there's no need to
 
 ## SGX VM (native and SGX arms)
 
-SGX VMs don't need a `--security-type`/confidential-VM flag, because SGX is
-exposed as a CPU feature on a normal VM. They do require a Generation 2
+This section creates the SGX VM. It doesn't need a
+`--security-type`/confidential-VM flag, because SGX is
+exposed as a CPU feature on a normal VM. It does require a Generation 2
 image, and the Ubuntu 24.04 `server` SKU is Gen2 (note: Microsoft's SGX docs
 officially list Ubuntu 20.04/22.04 Gen2. 24.04 boots as Gen2 all the same,
 but if the SGX driver stack misbehaves, 22.04
@@ -150,8 +148,9 @@ az vm create \
 
 ## TDX VM
 
-The TDX VM needs `--security-type ConfidentialVM` plus OS disk encryption and
-boot-security flags, and the CVM image SKU. **Confirm the current flags
+This section creates the TDX VM. It needs `--security-type ConfidentialVM`
+plus OS disk encryption and boot-security flags, and the CVM image SKU.
+**Confirm the current flags
 against Microsoft's own quickstart before running this**, since
 confidential-VM CLI options have changed across Azure CLI versions:
 [Create an Azure confidential VM in the Azure portal](https://learn.microsoft.com/en-us/azure/confidential-computing/quick-create-confidential-vm-portal),
