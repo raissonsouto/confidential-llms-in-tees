@@ -11,10 +11,6 @@ Repository to include scripts to run inference benchmarks in CC environments.
   - [CPUs](#cpus)
     - [Common Setup](#common-setup)
     - [SGX Setup](#sgx-setup)
-    - [TDX Setup](#tdx-setup)
-      - [Prepare a TDX VM image](#prepare-a-tdx-vm-image)
-      - [Copy the repository to the VM](#copy-the-repository-to-the-vm)
-      - [Enable hugepages](#enable-hugepages)
     - [Running baseline experiments](#running-baseline-experiments)
     - [Running TDX experiments](#running-tdx-experiments)
     - [Running SGX experiments](#running-sgx-experiments)
@@ -105,74 +101,6 @@ docker run --rm --privileged sgx-ipex-llm:2.2.0 bash -c "cd gramine/CI-Examples/
 
 It should print `Hello, world` after a `sgx.debug = true` warning (expected: debug manifests, fine for benchmarking). For other Gramine errors, see [its documentation](https://gramine.readthedocs.io/en/stable/).
 
-### TDX Setup
-
-> [!NOTE]
-> **On-prem only.** This whole section builds and boots a TD guest on your own TDX host. On a CSP machine (e.g., the Azure `DC16es_v6` Confidential VM), the VM is already a TDX guest: skip to [Running TDX experiments](#running-tdx-experiments).
-
-#### Prepare a TDX VM image
-Use TDX guest tools to generate a TDX VM image. By default, we create a 300GB image but it should be at least 200GB (required for 70B Llama2 model). For more in depth treatment such as BIOS configuration for TDX, follow the instructions within the [Ubuntu's TDX](https://github.com/canonical/tdx) repository. In short, run:
-```sh
-cd tdx/guest-tools/image/
-sudo ./create-td-image.sh
-```
-Update the `td_guest.xml` to point to the newly created image. Then, define and start the TD:
-```sh
-sudo virsh define td_guest.xml
-sudo virsh start tdx
-```
-The default PW of user `ubuntu` is `123456`. The default port on which the VM will be available is 10022.
-If you run into permission issues, it might be useful to copy the qcow2 file to libvirt's images:
-```sh
-sudo cp ~/confidential-llms-in-tees/tdx/guest-tools/image/tdx-guest-ubuntu-24.04-generic.qcow2 /var/lib/libvirt/images/
-```
-Consider creating an ssh key and copying it to the running TD for faster login.
-
-#### Copy the repository to the VM
-Initialize the repository in the VM exactly as outlined above in host setup or use `rsync` to copy the files to the VM:
-```sh
-rsync -avzog --exclude tdx/ -e 'ssh -p 10022' confidential-llms-in-tees/ tdx@localhost:~/confidential-llms-in-tees
-```
-SSH to the VM and run the host setup script:
-```sh
-ssh -p 10022 tdx@localhost
-cd confidential-llms-in-tees
-./host_setup.sh   # reads HUGGINGFACE_TOKEN from .env, or pass it inline
-```
-See [Hugging Face access token](#hugging-face-access-token) in Prerequisites for what permissions this token needs. Relogin to apply changes in groups. Finally, compile the docker container:
-```sh
-cd confidential-llms-in-tees/intel-extension-for-pytorch/
-DOCKER_BUILDKIT=1 docker build -f examples/cpu/inference/python/llm/Dockerfile -t ipex-llm:2.3.100 .
-```
-
-#### Enable hugepages
-In case you would like to measure the VMs with enabled 1GB hugepages, first modify Grub configuration in `/etc/default/grub` (e.g., for `<num_hugepages>=300`)
-```sh
-GRUB_CMDLINE_LINUX="nomodeset kvm_intel.tdx=1 default_hugepagesz=1G hugepagesz=1G hugepages=<num_hugepages> transparent_hugepages=always"
-```
-Then system.ctl `/etc/sysctl.conf`
-```sh
-vm.nr_hugepages=<num_hugepages>
-```
-Update grub
-```sh
-sudo update-grub
-sudo reboot
-```
-
-To verify that the hugepages are indeed enabled, after reboot run:
-```sh
-cat /proc/meminfo | grep HugePages
-```
-which should report `<num_hugepages>`. 
-
-Once rebooted, remember to use the hugepages version of the `.xml` VM definition file and modify it with `<num_hugepages>`. Then define and start this new VM:
-```sh
-sudo virsh define td_guest-hugepages.xml
-sudo virsh tdx-hugepages
-```
-As of writing this, TDX does not support hugepages, so if you allocate 300GB of 1GB pages, it will still try to use 2MB pages and you might run out of memory. We used these pages only for VM measurements, and for TDX we used the default pages.
-
 ### Running baseline experiments
 
 ```sh
@@ -182,9 +110,9 @@ nohup ./run.sh baseline &
 This will generate a folder under `results/` with the current date and time and add an entry into the experiment log. All generated files will have the form `baseline-system-in_size-out_size-vCPUs-numa-batch_size-model-data_type.txt`.
 
 ### Running TDX experiments
-SSH to the TDX machine. On Azure that is the `DC16es_v6` VM (`ssh azureuser@<tdx-vm-ip>`); on-prem it is the TD guest created in [TDX Setup](#tdx-setup):
+SSH to the TDX machine (the Azure `DC16es_v6` VM):
 ```sh
-ssh -p 10022 tdx@localhost   # on-prem TD guest only
+ssh azureuser@<tdx-vm-ip>
 ```
 
 Run the experiments via:
