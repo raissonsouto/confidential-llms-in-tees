@@ -33,17 +33,21 @@ the actual benchmark setup and execution is covered in the main
 | Image | Ubuntu 24.04 LTS (Gen2 `server` SKU) | Ubuntu 24.04 LTS (`cvm` SKU) |
 | Arms it runs | Native baseline **and** SGX | TDX |
 
-\* The native baseline shares the SGX VM because SGX is opt-in per process:
-`gramine-sgx` enters the enclave only for the workload it launches, so the
-same machine runs the same docker image with and without the TEE. TDX
-instead encrypts the entire VM and cannot be disabled from inside, so the
-TDX machine cannot host a native run.
+> \* The native baseline shares the SGX VM because SGX is opt-in per process:
+> `gramine-sgx` enters the enclave only for the workload it launches, so the
+> same machine runs the same docker image with and without the TEE. TDX
+> instead encrypts the entire VM and cannot be disabled from inside, so the
+> TDX machine cannot host a native run.
 
-The memory gap doesn't distort the results: Llama-2-7B in bf16 (~14 GB) fits
-comfortably in both VMs and in the SGX EPC (64 GiB), and DCsv3 has no
-16 vCPU / 64 GiB size anyway. Since the VMs are different hardware
-generations, the comparable quantity is each machine's TEE-vs-native ratio,
-not absolute latencies. All runs use bfloat16 and the same `run.sh`.
+The memory gap (a consequence of each family's fixed vCPU-to-memory ratio:
+1:8 for DCsv3, 1:4 for DCesv6) doesn't affect the batch-1 measurements:
+Llama-2-7B in bf16 (~14 GB) fits comfortably in both VMs and in the SGX EPC
+(64 GiB), avoiding EPC paging. At batch size 64, however, memory becomes the
+binding constraint: 512-token inputs exceed the TDX VM's 64 GiB, and
+2048-token inputs exceed even the 128 GiB machine — both runs are killed by
+the kernel OOM killer. Since the VMs are different hardware generations, the
+comparable quantity is each machine's TEE-vs-native ratio, not absolute
+latencies. All runs use bfloat16 and the same `run.sh`.
 
 ## Prerequisites
 
@@ -72,10 +76,11 @@ cp config.env .env
 source .env
 ```
 
-`.env` is gitignored because it also holds `HUGGINGFACE_TOKEN`. Never commit
-a file with a real token.
+`.env` is gitignored because it also holds `HUGGINGFACE_TOKEN`.
 
 ## Resource group
+
+Creates the container everything else (VMs, disks, NICs) gets deployed into:
 
 ```sh
 az group create --name $AZURE_RESOURCE_GROUP --location $AZURE_REGION
@@ -112,6 +117,9 @@ az vm list-skus --location $TDX_VM_REGION --size DC16es_v6 --resource-type virtu
 If quota is 0 or the SKU is restricted, see
 [Requesting a quota increase](#requesting-a-quota-increase) in the
 Troubleshooting section.
+
+Quota increases don't bill anything on their own, so there's no need to
+"return" them.
 
 ## SGX VM (native and SGX arms)
 
@@ -173,14 +181,29 @@ A stopped VM still bills unless it's **deallocated**, so always use
 
 ```sh
 az vm deallocate --resource-group $AZURE_RESOURCE_GROUP --name $SGX_VM_NAME
+az vm deallocate --resource-group $AZURE_RESOURCE_GROUP --name $TDX_VM_NAME
 az vm list --resource-group $AZURE_RESOURCE_GROUP --show-details --query "[].{name:name, power:powerState}" -o table
 ```
 
 ## Cleaning up
 
-When the experiments are done, delete the whole resource group. This removes
-the VMs and everything created alongside them (disks, NICs, public IPs, NSGs),
-which `az vm delete` alone would leave behind:
+To delete a single VM but keep the rest, remove it together with its
+attached resources:
+
+```sh
+az vm delete --resource-group $AZURE_RESOURCE_GROUP --name $SGX_VM_NAME --yes
+az vm delete --resource-group $AZURE_RESOURCE_GROUP --name $TDX_VM_NAME --yes
+```
+
+Then list what's left over and delete orphaned disks/NICs/IPs by name:
+
+```sh
+az resource list --resource-group $AZURE_RESOURCE_GROUP -o table
+```
+
+When the experiments are done, delete the whole resource group instead. This
+removes the VMs and everything created alongside them (disks, NICs, public
+IPs, NSGs), which `az vm delete` alone would leave behind:
 
 ```sh
 # make sure results are copied off the VMs first, e.g.:
@@ -191,17 +214,7 @@ az group delete --name $AZURE_RESOURCE_GROUP --yes --no-wait
 
 `--no-wait` returns immediately; check progress with
 `az group show --name $AZURE_RESOURCE_GROUP` (a `ResourceGroupNotFound` error
-means the deletion finished). To delete a single VM but keep the rest, remove
-it together with its attached resources:
-
-```sh
-az vm delete --resource-group $AZURE_RESOURCE_GROUP --name $SGX_VM_NAME --yes
-# then list what's left over and delete orphaned disks/NICs/IPs by name:
-az resource list --resource-group $AZURE_RESOURCE_GROUP -o table
-```
-
-Quota increases don't bill anything on their own, so there's no need to
-"return" them.
+means the deletion finished).
 
 ## Troubleshooting
 
