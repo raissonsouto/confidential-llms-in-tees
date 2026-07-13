@@ -1,0 +1,57 @@
+WARNING: you should run this program as super-user.
+tdx-vm
+    description: Computer
+    width: 64 bits
+    capabilities: smp vsyscall32
+  *-core
+       description: Motherboard
+       physical id: 0
+     *-memory
+          description: System memory
+          physical id: 0
+          size: 63GiB
+     *-cpu
+          product: InteTD X   l
+          vendor: Intel Corp.
+          physical id: 1
+          bus info: cpu@0
+          version: 6.207.2
+          width: 64 bits
+          capabilities: fpu fpu_exception wp vme de pse tsc msr pae mce cx8 apic sep pge mca cmov pat clflush mmx fxsr sse sse2 ht syscall nx pdpe1gb rdtscp x86-64 constant_tsc rep_good nopl xtopology nonstop_tsc cpuid tsc_known_freq pni pclmulqdq ssse3 fma cx16 pcid sse4_1 sse4_2 x2apic movbe popcnt aes xsave avx f16c rdrand hypervisor lahf_lm abm 3dnowprefetch pti fsgsbase bmi1 avx2 smep bmi2 erms invpcid avx512f avx512dq rdseed adx smap avx512ifma clflushopt clwb avx512cd sha_ni avx512bw avx512vl xsaveopt xsavec xsaves user_shstk avx_vnni avx512_bf16 avx512vbmi umip waitpkg avx512_vbmi2 gfni vaes vpclmulqdq avx512_vnni avx512_bitalg avx512_vpopcntdq rdpid cldemote movdiri movdir64b fsrm serialize amx_bf16 avx512_fp16 amx_tile amx_int8
+     *-pnp00:00
+          product: PnP device PNP0501
+          physical id: 2
+          capabilities: pnp
+          configuration: driver=serial
+     *-pnp00:01
+          product: PnP device PNP0501
+          physical id: 3
+          capabilities: pnp
+          configuration: driver=serial
+     *-pnp00:02
+          product: PnP device PNP0b00
+          physical id: 4
+          capabilities: pnp
+          configuration: driver=rtc_cmos
+     *-scsi
+          physical id: 5
+          logical name: scsi0
+        *-cdrom
+             description: SCSI CD-ROM
+             product: Virtual DVD-ROM
+             vendor: Msft
+             physical id: 0.0.2
+             bus info: scsi@0:0.0.2
+             logical name: /dev/cdrom
+             logical name: /dev/sr0
+             version: 1.0
+             capabilities: removable audio
+             configuration: status=nodisc
+  *-network
+       description: Ethernet interface
+       physical id: 1
+       logical name: eth0
+       serial: 70:a8:a5:1a:d5:01
+       capabilities: ethernet physical
+       configuration: autonegotiation=off broadcast=yes driver=hv_netvsc driverversion=6.17.0-1015-azure-fde duplex=full firmware=N/A ip=10.0.0.4 link=yes multicast=yes
+WARNING: output may be incomplete or inaccurate, you should run this program as super-user.

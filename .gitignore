@@ -1,4 +1,4 @@
-results/
+/CPU/results/
 models/
 experiment.log
 nohup.out

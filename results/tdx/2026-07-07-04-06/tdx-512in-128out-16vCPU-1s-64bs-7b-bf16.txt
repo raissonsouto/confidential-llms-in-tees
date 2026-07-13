@@ -1,0 +1,128 @@
+docker run --rm --privileged --shm-size=2gb -v /home/azureuser/.cache:/home/ubuntu/.cache ipex-llm:2.3.100 bash -c export ATEN_CPU_CAPABILITY=avx512 ONEDNN_MAX_CPU_ISA=AVX512_CORE_BF16 LIBXSMM_TARGET=cpx && cd llm && source ../miniforge3/bin/activate && conda activate py310 && source tools/env_activate.sh && sudo chown -R 1000:1000 ~/.cache && deepspeed --bind_cores_to_rank --bind_core_list 0-15 distributed/run_generation_with_deepspeed.py --deployment-mode --profile --benchmark -m meta-llama/Llama-2-7b-hf  --ipex --dtype bfloat16 --batch-size 64 --num-iter 30 --num-warmup 5 --max-new-tokens 128 --input-tokens 512 --token-latency 
+/home/ubuntu/miniforge3/envs/py310/lib/python3.10/site-packages/intel_extension_for_pytorch/nn/utils/_weight_prepack.py:5: UserWarning: pkg_resources is deprecated as an API. See https://setuptools.pypa.io/en/latest/pkg_resources.html. The pkg_resources package is slated for removal as early as 2025-11-30. Refrain from using this package or pin to Setuptools<81.
+  import pkg_resources
+/home/ubuntu/miniforge3/envs/py310/lib/python3.10/site-packages/torch/distributed/distributed_c10d.py:266: UserWarning: Device capability of ccl unspecified, assuming `cpu` and `cuda`. Please specify it via the `devices` argument of `register_backend`.
+  warnings.warn(
+Warning: Cannot load xpu CCL. CCL doesn't work for XPU device
+[2026-07-07 11:53:31,728] [INFO] [real_accelerator.py:203:get_accelerator] Setting ds_accelerator to cpu (auto detect)
+[2026-07-07 11:53:34,116] [WARNING] [runner.py:202:fetch_hostfile] Unable to find hostfile, will proceed with training with local resources only.
+[2026-07-07 11:53:34,121] [INFO] [runner.py:568:main] cmd = /home/ubuntu/miniforge3/envs/py310/bin/python -u -m deepspeed.launcher.launch --world_info=eyJsb2NhbGhvc3QiOiBbMF19 --master_addr=127.0.0.1 --master_port=29500 --enable_each_rank_log=None --bind_cores_to_rank --bind_core_list=0-15 distributed/run_generation_with_deepspeed.py --deployment-mode --profile --benchmark -m meta-llama/Llama-2-7b-hf --ipex --dtype bfloat16 --batch-size 64 --num-iter 30 --num-warmup 5 --max-new-tokens 128 --input-tokens 512 --token-latency
+/home/ubuntu/miniforge3/envs/py310/lib/python3.10/site-packages/intel_extension_for_pytorch/nn/utils/_weight_prepack.py:5: UserWarning: pkg_resources is deprecated as an API. See https://setuptools.pypa.io/en/latest/pkg_resources.html. The pkg_resources package is slated for removal as early as 2025-11-30. Refrain from using this package or pin to Setuptools<81.
+  import pkg_resources
+Warning: Cannot load xpu CCL. CCL doesn't work for XPU device
+/home/ubuntu/miniforge3/envs/py310/lib/python3.10/site-packages/torch/distributed/distributed_c10d.py:266: UserWarning: Device capability of ccl unspecified, assuming `cpu` and `cuda`. Please specify it via the `devices` argument of `register_backend`.
+  warnings.warn(
+[2026-07-07 11:53:36,216] [INFO] [real_accelerator.py:203:get_accelerator] Setting ds_accelerator to cpu (auto detect)
+[2026-07-07 11:53:38,457] [INFO] [launch.py:146:main] WORLD INFO DICT: {'localhost': [0]}
+[2026-07-07 11:53:38,457] [INFO] [launch.py:152:main] nnodes=1, num_local_procs=1, node_rank=0
+[2026-07-07 11:53:38,457] [INFO] [launch.py:163:main] global_rank_mapping=defaultdict(<class 'list'>, {'localhost': [0]})
+[2026-07-07 11:53:38,457] [INFO] [launch.py:164:main] dist_world_size=1
+[2026-07-07 11:53:38,457] [INFO] [launch.py:168:main] Setting CUDA_VISIBLE_DEVICES=0
+[2026-07-07 11:53:38,476] [INFO] [launch.py:256:main] process 304 spawned with command: ['numactl', '-m', '0', '-C', '0-15', '/home/ubuntu/miniforge3/envs/py310/bin/python', '-u', 'distributed/run_generation_with_deepspeed.py', '--local_rank=0', '--deployment-mode', '--profile', '--benchmark', '-m', 'meta-llama/Llama-2-7b-hf', '--ipex', '--dtype', 'bfloat16', '--batch-size', '64', '--num-iter', '30', '--num-warmup', '5', '--max-new-tokens', '128', '--input-tokens', '512', '--token-latency']
+My guessed rank = 0
+/home/ubuntu/miniforge3/envs/py310/lib/python3.10/site-packages/intel_extension_for_pytorch/nn/utils/_weight_prepack.py:5: UserWarning: pkg_resources is deprecated as an API. See https://setuptools.pypa.io/en/latest/pkg_resources.html. The pkg_resources package is slated for removal as early as 2025-11-30. Refrain from using this package or pin to Setuptools<81.
+  import pkg_resources
+/home/ubuntu/miniforge3/envs/py310/lib/python3.10/site-packages/torch/distributed/distributed_c10d.py:266: UserWarning: Device capability of ccl unspecified, assuming `cpu` and `cuda`. Please specify it via the `devices` argument of `register_backend`.
+  warnings.warn(
+Warning: Cannot load xpu CCL. CCL doesn't work for XPU device
+[2026-07-07 11:53:40,578] [INFO] [real_accelerator.py:203:get_accelerator] Setting ds_accelerator to cpu (auto detect)
+Using /home/ubuntu/.cache/torch_extensions/py310_cpu as PyTorch extensions root...
+Emitting ninja build file /home/ubuntu/.cache/torch_extensions/py310_cpu/deepspeed_ccl_comm/build.ninja...
+Building extension module deepspeed_ccl_comm...
+Allowing ninja to set a default number of workers... (overridable by setting the environment variable MAX_JOBS=N)
+ninja: no work to do.
+Loading extension module deepspeed_ccl_comm...
+Time to load deepspeed_ccl_comm op: 0.02470541000366211 seconds
+DeepSpeed deepspeed.ops.comm.deepspeed_ccl_comm_op built successfully
+Using /home/ubuntu/.cache/torch_extensions/py310_cpu as PyTorch extensions root...
+Emitting ninja build file /home/ubuntu/.cache/torch_extensions/py310_cpu/deepspeed_shm_comm/build.ninja...
+Building extension module deepspeed_shm_comm...
+Allowing ninja to set a default number of workers... (overridable by setting the environment variable MAX_JOBS=N)
+ninja: no work to do.
+Loading extension module deepspeed_shm_comm...
+Time to load deepspeed_shm_comm op: 0.02047586441040039 seconds
+DeepSpeed deepspeed.ops.comm.deepspeed_shm_comm_op built successfully
+2026:07:07-11:53:42:(  304) |CCL_WARN| did not find MPI-launcher specific variables, switch to ATL/OFI, to force enable ATL/MPI set CCL_ATL_TRANSPORT=mpi
+2026:07:07-11:53:42:(  304) |CCL_WARN| could not get local_idx/count from environment variables, trying to get them from ATL
+[2026-07-07 11:53:43,418] [INFO] [comm.py:161:init_deepspeed_backend] Initialize ccl backend
+[2026-07-07 11:53:43,418] [INFO] [comm.py:637:init_distributed] cdb=<deepspeed.comm.ccl.CCLBackend object at 0x77e896377bb0>
+[2026-07-07 11:53:43,418] [INFO] [comm.py:662:init_distributed] Distributed backend already initialized
+*** Loading the model meta-llama/Llama-2-7b-hf
+/home/ubuntu/miniforge3/envs/py310/lib/python3.10/site-packages/huggingface_hub/file_download.py:949: FutureWarning: `resume_download` is deprecated and will be removed in version 1.0.0. Downloads always resume when possible. If you want to force a new download, use `force_download=True`.
+  warnings.warn(
+[2026-07-07 11:53:43,848] [INFO] [utils.py:781:see_memory_usage] pre-from-pretrained
+[2026-07-07 11:53:43,849] [INFO] [utils.py:782:see_memory_usage] MA 0.56 GB         Max_MA 0.56 GB         CA 0.56 GB         Max_CA 1 GB 
+[2026-07-07 11:53:43,849] [INFO] [utils.py:789:see_memory_usage] CPU Virtual Memory:  used = 2.92 GB, percent = 4.7%
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [00:09<00:09,  9.32s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:12<00:00,  5.92s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:12<00:00,  6.43s/it]
+[2026-07-07 11:53:56,920] [INFO] [utils.py:781:see_memory_usage] post-from-pretrained
+[2026-07-07 11:53:56,921] [INFO] [utils.py:782:see_memory_usage] MA 13.23 GB         Max_MA 13.23 GB         CA 13.23 GB         Max_CA 13 GB 
+[2026-07-07 11:53:56,921] [INFO] [utils.py:789:see_memory_usage] CPU Virtual Memory:  used = 15.57 GB, percent = 25.3%
+[2026-07-07 11:53:57,054] [INFO] [utils.py:781:see_memory_usage] post-init-ds-zero-init
+[2026-07-07 11:53:57,054] [INFO] [utils.py:782:see_memory_usage] MA 13.23 GB         Max_MA 13.23 GB         CA 13.23 GB         Max_CA 13 GB 
+[2026-07-07 11:53:57,054] [INFO] [utils.py:789:see_memory_usage] CPU Virtual Memory:  used = 15.57 GB, percent = 25.3%
+[2026-07-07 11:53:57,186] [INFO] [utils.py:781:see_memory_usage] pre-ds-inference-init
+[2026-07-07 11:53:57,186] [INFO] [utils.py:782:see_memory_usage] MA 13.23 GB         Max_MA 13.23 GB         CA 13.23 GB         Max_CA 13 GB 
+[2026-07-07 11:53:57,186] [INFO] [utils.py:789:see_memory_usage] CPU Virtual Memory:  used = 15.57 GB, percent = 25.3%
+Fetching 11 files:   0%|          | 0/11 [00:00<?, ?it/s]Fetching 11 files: 100%|██████████| 11/11 [00:00<00:00, 2171.88it/s]
+Fetching 11 files:   0%|          | 0/11 [00:00<?, ?it/s]Fetching 11 files: 100%|██████████| 11/11 [00:00<00:00, 8141.41it/s]
+Fetching 11 files:   0%|          | 0/11 [00:00<?, ?it/s]Fetching 11 files: 100%|██████████| 11/11 [00:00<00:00, 15725.07it/s]
+Fetching 11 files:   0%|          | 0/11 [00:00<?, ?it/s]Fetching 11 files: 100%|██████████| 11/11 [00:00<00:00, 9506.97it/s]
+[2026-07-07 11:53:57,566] [INFO] [logging.py:96:log_dist] [Rank 0] DeepSpeed info: version=0.14.3, git-hash=unknown, git-branch=unknown
+[2026-07-07 11:53:57,566] [WARNING] [config_utils.py:69:_process_deprecated_field] Config parameter mp_size is deprecated use tensor_parallel.tp_size instead
+[2026-07-07 11:53:57,566] [INFO] [logging.py:96:log_dist] [Rank 0] quantize_bits = 8 mlp_extra_grouping = False, quantize_groups = 1
+[2026-07-07 11:53:57,708] [INFO] [utils.py:781:see_memory_usage] post-ds-inference-init
+[2026-07-07 11:53:57,708] [INFO] [utils.py:782:see_memory_usage] MA 13.23 GB         Max_MA 13.23 GB         CA 13.23 GB         Max_CA 13 GB 
+[2026-07-07 11:53:57,708] [INFO] [utils.py:789:see_memory_usage] CPU Virtual Memory:  used = 15.57 GB, percent = 25.3%
+[INFO] SINGLE_INSTANCE MODE.
+/home/ubuntu/miniforge3/envs/py310/lib/python3.10/site-packages/transformers/modeling_utils.py:4193: FutureWarning: `_is_quantized_training_enabled` is going to be deprecated in transformers 4.39.0. Please use `model.hf_quantizer.is_trainable` instead
+  warnings.warn(
+The cos_cached attribute will be removed in 4.40. Bear in mind that its contents changed in v4.38. Use the forward method of RoPE from now on instead.
+The sin_cached attribute will be removed in 4.40. Bear in mind that its contents changed in v4.38. Use the forward method of RoPE from now on instead.
+/home/ubuntu/miniforge3/envs/py310/lib/python3.10/site-packages/intel_extension_for_pytorch/transformers/models/reference/modules/attentions.py:2779: TracerWarning: Converting a tensor to a Python boolean might cause the trace to be incorrect. We can't record the data flow of Python values, so this value will be treated as a constant in the future. This means that the trace might not generalize to other inputs!
+  if input_shape[-1] > 1:
+/home/ubuntu/miniforge3/envs/py310/lib/python3.10/site-packages/intel_extension_for_pytorch/transformers/models/reference/modules/attentions.py:2742: TracerWarning: Converting a tensor to a Python boolean might cause the trace to be incorrect. We can't record the data flow of Python values, so this value will be treated as a constant in the future. This means that the trace might not generalize to other inputs!
+  if past_key_values_length > 0:
+/home/ubuntu/miniforge3/envs/py310/lib/python3.10/site-packages/intel_extension_for_pytorch/transformers/models/reference/modules/attentions.py:2795: TracerWarning: torch.tensor results are registered as constants in the trace. You can safely ignore this warning if you use this function to create tensors out of constant variables that would be the same every time you call this function. In any other case, this might cause the trace to be incorrect.
+  else torch.tensor(expanded_attn_mask)
+/home/ubuntu/miniforge3/envs/py310/lib/python3.10/site-packages/intel_extension_for_pytorch/transformers/models/reference/modules/attentions.py:2795: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  else torch.tensor(expanded_attn_mask)
+/home/ubuntu/miniforge3/envs/py310/lib/python3.10/site-packages/intel_extension_for_pytorch/transformers/models/reference/modules/attentions.py:2796: TracerWarning: torch.tensor results are registered as constants in the trace. You can safely ignore this warning if you use this function to create tensors out of constant variables that would be the same every time you call this function. In any other case, this might cause the trace to be incorrect.
+  + torch.tensor(combined_attention_mask)
+/home/ubuntu/miniforge3/envs/py310/lib/python3.10/site-packages/intel_extension_for_pytorch/transformers/models/reference/modules/attentions.py:2796: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  + torch.tensor(combined_attention_mask)
+/home/ubuntu/miniforge3/envs/py310/lib/python3.10/site-packages/intel_extension_for_pytorch/transformers/models/reference/fusions/mha_fusion.py:164: TracerWarning: torch.tensor results are registered as constants in the trace. You can safely ignore this warning if you use this function to create tensors out of constant variables that would be the same every time you call this function. In any other case, this might cause the trace to be incorrect.
+  torch.tensor(self.inv_freq).contiguous(),
+/home/ubuntu/miniforge3/envs/py310/lib/python3.10/site-packages/intel_extension_for_pytorch/transformers/models/reference/fusions/mha_fusion.py:164: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  torch.tensor(self.inv_freq).contiguous(),
+/home/ubuntu/miniforge3/envs/py310/lib/python3.10/site-packages/intel_extension_for_pytorch/transformers/models/reference/fusions/mha_fusion.py:165: TracerWarning: torch.tensor results are registered as constants in the trace. You can safely ignore this warning if you use this function to create tensors out of constant variables that would be the same every time you call this function. In any other case, this might cause the trace to be incorrect.
+  torch.tensor(self.max_seq_len_cached).contiguous(),
+/home/ubuntu/miniforge3/envs/py310/lib/python3.10/site-packages/intel_extension_for_pytorch/transformers/models/reference/fusions/mha_fusion.py:166: TracerWarning: torch.tensor results are registered as constants in the trace. You can safely ignore this warning if you use this function to create tensors out of constant variables that would be the same every time you call this function. In any other case, this might cause the trace to be incorrect.
+  torch.tensor(self.max_position_embeddings).contiguous(),
+/home/ubuntu/miniforge3/envs/py310/lib/python3.10/site-packages/intel_extension_for_pytorch/transformers/models/reference/fusions/mha_fusion.py:173: TracerWarning: torch.tensor results are registered as constants in the trace. You can safely ignore this warning if you use this function to create tensors out of constant variables that would be the same every time you call this function. In any other case, this might cause the trace to be incorrect.
+  torch.tensor(seq_len).contiguous(),
+/home/ubuntu/miniforge3/envs/py310/lib/python3.10/site-packages/intel_extension_for_pytorch/transformers/models/reference/fusions/mha_fusion.py:173: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  torch.tensor(seq_len).contiguous(),
+/home/ubuntu/miniforge3/envs/py310/lib/python3.10/site-packages/intel_extension_for_pytorch/transformers/models/reference/fusions/mha_fusion.py:174: TracerWarning: torch.tensor results are registered as constants in the trace. You can safely ignore this warning if you use this function to create tensors out of constant variables that would be the same every time you call this function. In any other case, this might cause the trace to be incorrect.
+  torch.tensor(rope_type).contiguous(),
+/home/ubuntu/miniforge3/envs/py310/lib/python3.10/site-packages/intel_extension_for_pytorch/transformers/models/reference/fusions/mha_fusion.py:177: TracerWarning: Converting a tensor to a Python number might cause the trace to be incorrect. We can't record the data flow of Python values, so this value will be treated as a constant in the future. This means that the trace might not generalize to other inputs!
+  self.max_seq_len_cached = max_seq_len_cached.item()
+/home/ubuntu/miniforge3/envs/py310/lib/python3.10/site-packages/intel_extension_for_pytorch/transformers/models/cpu/fusions/mha_fusion.py:229: TracerWarning: torch.tensor results are registered as constants in the trace. You can safely ignore this warning if you use this function to create tensors out of constant variables that would be the same every time you call this function. In any other case, this might cause the trace to be incorrect.
+  seq_info = torch.tensor(
+/home/ubuntu/miniforge3/envs/py310/lib/python3.10/site-packages/intel_extension_for_pytorch/transformers/models/cpu/fusions/mha_fusion.py:229: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  seq_info = torch.tensor(
+/home/ubuntu/miniforge3/envs/py310/lib/python3.10/site-packages/intel_extension_for_pytorch/transformers/models/reference/models.py:295: TracerWarning: Converting a tensor to a Python boolean might cause the trace to be incorrect. We can't record the data flow of Python values, so this value will be treated as a constant in the future. This means that the trace might not generalize to other inputs!
+  and hidden_states.size(1) != 1
+ipex.llm.optimize has set the optimized or quantization model for model.generate()
+*** Starting to generate 128 tokens with bs=64
+Generate args {'do_sample': False, 'num_beams': 4, 'max_new_tokens': 128, 'min_new_tokens': 128, 'streamer': None}
+*** Prompt size:  512
+[2026-07-07 11:54:07,085] [INFO] [utils.py:781:see_memory_usage] end-of-run
+[2026-07-07 11:54:07,086] [INFO] [utils.py:782:see_memory_usage] MA 17.66 GB         Max_MA 17.66 GB         CA 17.66 GB         Max_CA 18 GB 
+[2026-07-07 11:54:07,086] [INFO] [utils.py:789:see_memory_usage] CPU Virtual Memory:  used = 20.03 GB, percent = 32.5%
+*** Running benchmark
+/home/ubuntu/miniforge3/envs/py310/lib/python3.10/site-packages/transformers/generation/configuration_utils.py:410: UserWarning: `do_sample` is set to `False`. However, `temperature` is set to `0.6` -- this flag is only used in sample-based generation modes. You should set `do_sample=True` or unset `temperature`.
+  warnings.warn(
+/home/ubuntu/miniforge3/envs/py310/lib/python3.10/site-packages/transformers/generation/configuration_utils.py:415: UserWarning: `do_sample` is set to `False`. However, `top_p` is set to `0.9` -- this flag is only used in sample-based generation modes. You should set `do_sample=True` or unset `top_p`.
+  warnings.warn(
+[2026-07-07 12:06:09,979] [INFO] [launch.py:319:sigkill_handler] Killing subprocess 304
+[2026-07-07 12:06:09,985] [ERROR] [launch.py:325:sigkill_handler] ['numactl', '-m', '0', '-C', '0-15', '/home/ubuntu/miniforge3/envs/py310/bin/python', '-u', 'distributed/run_generation_with_deepspeed.py', '--local_rank=0', '--deployment-mode', '--profile', '--benchmark', '-m', 'meta-llama/Llama-2-7b-hf', '--ipex', '--dtype', 'bfloat16', '--batch-size', '64', '--num-iter', '30', '--num-warmup', '5', '--max-new-tokens', '128', '--input-tokens', '512', '--token-latency'] exits with return code = -9
