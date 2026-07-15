@@ -14,7 +14,6 @@ Repository to include scripts to run inference benchmarks in CC environments.
     - [Running baseline experiments](#running-baseline-experiments)
     - [Running TDX experiments](#running-tdx-experiments)
     - [Running SGX experiments](#running-sgx-experiments)
-    - [Quantizing models](#quantizing-models)
     - [Processing Results](#processing-results)
     - [Tracing](#tracing)
 
@@ -141,9 +140,6 @@ Notes:
 - The `sgx.debug = true` warning appears on every run and is expected.
 - Per-token latency will be visibly higher than the baseline on the same machine — that difference is the SGX overhead being measured.
 - Batch-64 configurations can fail with `DefaultCPUAllocator: can't allocate memory` **inside the enclave**: `llm.manifest.template` sets `sgx.enclave_size = "64G"` (sized to the EPC), and at batch 64 the benchmark defaults to 4-beam search, so KV cache and prefill activations can exceed it. Raising `sgx.enclave_size` past the EPC and rebuilding the image makes Gramine rely on kernel EPC paging — the run may then complete, but with a heavy, measurable slowdown.
-
-### Quantizing models
-To quantize the models, follow `genQuantLLamaModels.sh`.
 
 ### Processing Results
 
