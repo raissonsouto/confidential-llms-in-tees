@@ -14,8 +14,6 @@ Repository to include scripts to run inference benchmarks in CC environments.
     - [Running baseline experiments](#running-baseline-experiments)
     - [Running TDX experiments](#running-tdx-experiments)
     - [Running SGX experiments](#running-sgx-experiments)
-      - [Preparing the docker image for SGX](#preparing-the-docker-image-for-sgx)
-      - [Running SGX docker image for Benchmark](#running-sgx-docker-image-for-benchmark)
     - [Quantizing models](#quantizing-models)
     - [Processing Results](#processing-results)
     - [Tracing](#tracing)
@@ -123,39 +121,19 @@ nohup ./run.sh tdx &
 
 ### Running SGX experiments
 
-#### Preparing the docker image for SGX
-
-`sgx_setup.sh` already builds this image (see [SGX Setup](#sgx-setup)). To rebuild it manually: it requires the `ipex-llm:2.2.0` base image to already exist (`sgx/Dockerfile.sgx` is `FROM ipex-llm:2.2.0`, not the 2.3.100 image used by the baseline/TDX track), then:
-
-```sh
-DOCKER_BUILDKIT=1 docker build -f sgx/Dockerfile.sgx -t sgx-ipex-llm:2.2.0 .
-```
-
-#### Running SGX docker image for Benchmark
-
-Unlike the baseline/TDX arms, the SGX arm is not driven by `run.sh`: each configuration is one `gramine-sgx` invocation inside the `sgx-ipex-llm:2.2.0` container.
+Unlike the baseline/TDX arms, the SGX arm is not driven by `run.sh`: each configuration is one `gramine-sgx` invocation inside the `sgx-ipex-llm:2.2.0` container built by `sgx_setup.sh` (see [SGX Setup](#sgx-setup)). The sweep script at the repo root runs the full matrix — input tokens 128/512/2048 × batch size 1/64, 128 output tokens — serially, one container per configuration, following `run.sh`'s conventions (batch 1: `--greedy --num-warmup 10`; batch 64: no `--greedy`, `--num-warmup 5`).
 
 > [!IMPORTANT]
 > **Run the baseline sweep on this machine first.** The Gramine enclave has no network access (DNS resolution fails inside it), so the model can only be loaded offline from the mounted `~/.cache` — which the baseline run populates. With an empty cache the SGX run dies with `Couldn't connect to huggingface.co ... couldn't find it in the cached files`. The failed HEAD requests to huggingface.co at startup are normal; with a populated cache transformers falls back to the local files.
 
-One configuration, end to end, capturing the output into a file `run_parser.py` can read (the filename encodes every CSV column, so keep the pattern `sgx-<in>in-<out>out-<n>vCPU-1s-<bs>bs-7b-bf16.txt`):
-
 ```sh
-d=results/$(date +"%F-%H-%M"); mkdir -p $d
-docker run --rm --privileged --shm-size=2gb -v $HOME/.cache:/home/ubuntu/.cache sgx-ipex-llm:2.2.0 bash -c "\
-  . ./miniconda3/bin/activate && conda activate py310 && \
-  source ./llm/tools/env_activate.sh && cd ~/sgx && \
-  numactl -m 0 -C 0-15 gramine-sgx LLM ~/llm/single_instance/run_generation.py \
-    --ipex --token-latency --dtype bfloat16 -m meta-llama/Llama-2-7b-hf \
-    --input-tokens 128 --max-new-tokens 128 \
-    --num-iter 30 --num-warmup 10 --batch-size 1 --greedy --benchmark" \
-  &> $d/sgx-128in-128out-16vCPU-1s-1bs-7b-bf16.txt
+nohup bash run_sgx_sweep.sh > sweep.log 2>&1 &
 ```
+
+`nohup` detaches the sweep from the terminal so it survives an SSH disconnect. Results are written to a timestamped folder under `results/sgx/` (along with `lscpu` and `numactl --hardware` snapshots); filenames keep the `sgx-<in>in-<out>out-<n>vCPU-1s-<bs>bs-7b-bf16.txt` pattern `run_parser.py` parses. Overall progress (start/finish timestamps and exit codes per configuration) goes to `sweep.log`; each configuration's benchmark output goes to its own `.txt` file. Adjust `-C 0-15` in the script if the machine does not have 16 vCPUs.
 
 > [!IMPORTANT]
 > Do not drop `--ipex --token-latency`. Unlike the deepspeed script, `run_generation.py` applies IPEX optimization only when `--ipex` is passed — without it the run measures vanilla-transformers inference, which is not comparable to the baseline/TDX arms (and uses far more memory: full attention matrices instead of IPEX's fused path). `--token-latency` (which requires `--ipex`) emits the per-token latency lists that `run_parser.py` and the latency analysis need.
-
-Sweep the matrix by varying `--input-tokens` (128, 512, 2048) and `--batch-size` (1, 64), keeping the filename in sync. Match `run.sh`'s conventions: batch 1 uses `--greedy --num-warmup 10`; batch 64 drops `--greedy` and uses `--num-warmup 5`. Adjust `-C 0-15` to the machine's core list if not 16 vCPUs.
 
 Notes:
 
