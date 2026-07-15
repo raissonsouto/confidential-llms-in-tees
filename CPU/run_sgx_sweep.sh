@@ -3,7 +3,7 @@
 # Run detached: nohup bash run_sgx_sweep.sh > sweep.log 2>&1 &
 set -u
 
-d=results/sgx/$(date +"%F-%H-%M")
+d=results/$(date +"%F-%H-%M")
 mkdir -p "$d"
 
 lscpu > "$d/lscpu.out"

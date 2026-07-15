@@ -120,7 +120,7 @@ nohup ./run.sh tdx &
 
 ### Running SGX experiments
 
-Unlike the baseline/TDX arms, the SGX arm is not driven by `run.sh`: each configuration is one `gramine-sgx` invocation inside the `sgx-ipex-llm:2.2.0` container built by `sgx_setup.sh` (see [SGX Setup](#sgx-setup)). The sweep script at the repo root runs the full matrix — input tokens 128/512/2048 × batch size 1/64, 128 output tokens — serially, one container per configuration, following `run.sh`'s conventions (batch 1: `--greedy --num-warmup 10`; batch 64: no `--greedy`, `--num-warmup 5`).
+Unlike the baseline/TDX arms, the SGX arm is not driven by `run.sh`: each configuration is one `gramine-sgx` invocation inside the `sgx-ipex-llm:2.2.0` container built by `sgx_setup.sh` (see [SGX Setup](#sgx-setup)). `run_sgx_sweep.sh` runs the full matrix — input tokens 128/512/2048 × batch size 1/64, 128 output tokens — serially, following `run.sh`'s conventions. From `CPU/`:
 
 > [!IMPORTANT]
 > **Run the baseline sweep on this machine first.** The Gramine enclave has no network access (DNS resolution fails inside it), so the model can only be loaded offline from the mounted `~/.cache` — which the baseline run populates. With an empty cache the SGX run dies with `Couldn't connect to huggingface.co ... couldn't find it in the cached files`. The failed HEAD requests to huggingface.co at startup are normal; with a populated cache transformers falls back to the local files.
@@ -129,7 +129,7 @@ Unlike the baseline/TDX arms, the SGX arm is not driven by `run.sh`: each config
 nohup bash run_sgx_sweep.sh > sweep.log 2>&1 &
 ```
 
-`nohup` detaches the sweep from the terminal so it survives an SSH disconnect. Results are written to a timestamped folder under `results/sgx/` (along with `lscpu` and `numactl --hardware` snapshots); filenames keep the `sgx-<in>in-<out>out-<n>vCPU-1s-<bs>bs-7b-bf16.txt` pattern `run_parser.py` parses. Overall progress (start/finish timestamps and exit codes per configuration) goes to `sweep.log`; each configuration's benchmark output goes to its own `.txt` file. Adjust `-C 0-15` in the script if the machine does not have 16 vCPUs.
+Results and hardware snapshots are written to a timestamped folder under `results/`, with the same file naming `run_parser.py` parses; per-configuration progress and exit codes go to `sweep.log`, and the `nohup` launch survives SSH disconnects. Adjust `-C 0-15` in the script if the machine does not have 16 vCPUs.
 
 > [!IMPORTANT]
 > Do not drop `--ipex --token-latency`. Unlike the deepspeed script, `run_generation.py` applies IPEX optimization only when `--ipex` is passed — without it the run measures vanilla-transformers inference, which is not comparable to the baseline/TDX arms (and uses far more memory: full attention matrices instead of IPEX's fused path). `--token-latency` (which requires `--ipex`) emits the per-token latency lists that `run_parser.py` and the latency analysis need.
