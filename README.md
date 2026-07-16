@@ -1,5 +1,11 @@
 # Confidential LLM inference benchmarking in CC
 
+> This is a fork of [spcl/confidential-llms-in-tees](https://github.com/spcl/confidential-llms-in-tees),
+> the reference implementation for the paper
+> ["Confidential LLM Inference: Performance and Cost Across CPU and GPU TEEs" (arXiv:2509.18886)](https://arxiv.org/abs/2509.18886).
+> This fork reproduces the CPU TEE arms (baseline, SGX, TDX) of that paper on
+> a reduced sweep; see [Prerequisites](#prerequisites) below for the scope.
+
 Repository to include scripts to run inference benchmarks in CC environments.
 
 ## Table of contents
@@ -15,6 +21,7 @@ Repository to include scripts to run inference benchmarks in CC environments.
     - [Running TDX experiments](#running-tdx-experiments)
     - [Running SGX experiments](#running-sgx-experiments)
     - [Processing Results](#processing-results)
+      - [Generating figures for this reproduction's dataset](#generating-figures-for-this-reproductions-dataset)
     - [Tracing](#tracing)
 
 ## Prerequisites
@@ -155,6 +162,34 @@ python3 processing/run_parser.py results
 The output is written to `./results.csv` in the current directory and is
 **overwritten on every run**, so copy it elsewhere before re-parsing. The CSV
 can then be plotted with the helper functions in `processing/`.
+
+#### Generating figures for this reproduction's dataset
+
+The scripts in `processing/` were originally written for the full paper
+sweep (multiple vCPU counts, dual-socket NUMA, AMX on/off, 7B/13B/70B,
+bf16/int8). This reproduction only covers a single vCPU count (16), single
+socket, Llama-2-7B, bf16, batch size 1/64, input 128/512/2048 — so five of
+the original scripts were adapted to this reduced shape (`AMX*.py`,
+`price.py`, `model_scaling_double_socket.py`, `model_scaling_70B.py`, and
+`traces_parser.py` were left untouched: they need dimensions — AMX
+on/off, dual socket, 70B — that were never measured here). All of them read
+`results/results.csv` (produced by `run_parser.py` above) and are run from
+`CPU/processing/`:
+
+```sh
+cd CPU/processing
+python3 model_scaling_single_socket.py ../../results/results.csv   # throughput, baseline vs SGX vs TDX, by input size
+python3 batch_size_scaling.py         ../../results/results.csv   # throughput vs batch size (1 vs 64)
+python3 vCPUs_batch_size.py           ../../results/results.csv   # throughput + estimated cost, faceted by batch size
+python3 vCPUs_input.py                ../../results/results.csv   # throughput + estimated cost, faceted by input size
+python3 price_azure.py                                            # Azure DCsv3/DCesv6 on-demand price per vCPU (live API, no args)
+```
+
+Each writes one PNG directly to `results/` (`overall_single_socket.png`,
+`batch_scaling_combined.png`, `vCPUs_GPU_EMR_batches.png`,
+`vCPUs_GPU_EMR_inputs.png`, `azure_price.png`). `price_azure.py` needs
+outbound network access (it queries `prices.azure.com` live instead of using
+hardcoded prices); the other four are offline and only need `results.csv`.
 
 ### Tracing
 To obtain traces, start the Docker container:
