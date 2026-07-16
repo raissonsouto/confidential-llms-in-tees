@@ -11,13 +11,14 @@
 
 \usepackage{booktabs}
 \usepackage{multirow}
+\usepackage{stfloats} % allow bottom placement of full-width (table*) floats
 \graphicspath{{../results/}}
 
 % Remove ACM reference block and copyright footer for draft submission
 \settopmatter{printacmref=false}
 \renewcommand\footnotetextcopyrightpermission[1]{}
 \setcopyright{none}
-\acmConference[FPCC2 2026]{Fundamentos de Pesquisa Cient\'{i}fica em Computa\c{c}\~{a}o}{2026}{UFCG, Brazil}
+\acmConference[FPCC2 2026]{Fundamentos de Pesquisa Cient\'{i}fica em Computa\c{c}\~{a}o}{July 7, 2026}{UFCG, Brazil}
 \acmYear{2026}
 \acmDOI{}
 \acmISBN{}
@@ -51,9 +52,11 @@ Extensions (TDX) against a conventional virtual machine (VM) baseline. Our exper
 design is multifactorial with 30 repetitions per configuration, varying batch sizes
 (1 and 64) and input sequence lengths (128, 512, and 2048 tokens), with Advanced
 Matrix Extensions (AMX) acceleration disabled to isolate the overhead contribution of
-the TEE mechanism itself. The central claim under examination is whether CPU TEEs impose
-less than 10\% throughput overhead on LLM inference, and whether this bound holds on
-hardware distinct from the original study's Intel Xeon platforms.
+the TEE mechanism itself. Two claims are under examination: whether CPU TEEs impose
+less than 10\% throughput overhead on LLM inference on hardware distinct from the
+original study, and whether that relative overhead diminishes as batch size and input
+sequence length increase, as the amortization trend reported in the original study
+predicts.
 \end{abstract}
 
 % ---------------------------------------------------------------
@@ -89,12 +92,20 @@ Intel SGX; Intel TDX}
 % ---------------------------------------------------------------
 \section{Introduction}
 
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=\linewidth]{batch_scaling_combined.png}
+  \caption{Median throughput at 128-token inputs, by batch size and execution
+  environment.}
+  \label{fig:batch-scaling}
+\end{figure}
+
 Large Language Models (LLMs) have become essential infrastructure across industries
 ranging from healthcare to financial analysis~\cite{llm_survey}, yet their computational
 demands make on-premises deployment impractical for most organizations. LLM workloads
 are consequently migrated to Cloud Service Providers, where they routinely handle
-sensitive data: patient records, confidential legal documents, and proprietary financial
-analyses~\cite{chrapek2025confidential}. This exposes them to threats from malicious
+sensitive data: patient records, confidential legal documents, and proprietary source
+code~\cite{chrapek2025confidential}. This exposes them to threats from malicious
 insiders, adversarial co-tenants, and compromised hypervisors, with breaches carrying
 severe financial consequences given that model training costs can reach tens of millions
 of dollars~\cite{chrapek2025confidential}.
@@ -102,10 +113,12 @@ of dollars~\cite{chrapek2025confidential}.
 The security research community has explored three primary classes of protection mechanisms
 for LLM deployments in adversarial cloud environments. \emph{Machine learning-based
 methods}, including model watermarking and ownership
-verification schemes, operate post-hoc, detecting IP theft after it has occurred rather
+verification schemes~\cite{watermarking_survey}, operate post-hoc, detecting IP theft
+after it has occurred rather
 than actively preventing unauthorized access. These methods also fail to protect the
 confidentiality of user prompts. \emph{Cryptographic methods}, such as Homomorphic
-Encryption (HE)~\cite{he_ml} and Secure Multi-Party Computation (MPC), provide strong
+Encryption (HE)~\cite{he_ml} and Secure Multi-Party Computation (MPC)~\cite{secureml},
+provide strong
 provable security guarantees but impose performance overheads of up to four orders of
 magnitude, making them intractable for the compute-intensive inference workloads of modern
 LLMs. \emph{Confidential Computing} via Trusted Execution Environments (TEEs) addresses
@@ -120,7 +133,8 @@ Two dominant strategies exist for CPU-based TEEs in cloud deployments. \emph{Pro
 TEEs}, exemplified by Intel Software Guard Extensions (SGX)~\cite{intel_sgx}, protect
 individual processes within an encrypted Enclave Page Cache (EPC), with overhead arising
 from EPC paging, enclave transitions, and memory integrity verification. \emph{VM-based
-TEEs}, exemplified by Intel Trust Domain Extensions (TDX)~\cite{intel_tdx}, protect an
+TEEs}, exemplified by Intel Trust Domain Extensions (TDX)~\cite{intel_tdx} and AMD
+Secure Encrypted Virtualization (SEV-SNP)~\cite{amd_sev}, protect an
 entire virtual machine using a hardened KVM hypervisor, offering a broader trust boundary
 and simpler deployment at the cost of an additional virtualization performance penalty.
 
@@ -137,13 +151,16 @@ a higher virtualization tax of 1--5\% on top of the baseline overhead, and for s
 at low batch sizes, CPU TEEs can be more cost-effective than confidential GPU
 counterparts.
 
-Reproducibility is a cornerstone of scientific progress, yet systems research results
+Reproducibility is a cornerstone of scientific progress, yet independent re-execution
+of published computer-systems experiments remains rare and often
+difficult~\cite{collberg2016repeatability}, and systems research results
 are frequently sensitive to hardware microarchitecture, software versions, and
-infrastructure configuration. This paper reproduces the findings of
-Chrapek et al.~\cite{chrapek2025confidential} on independent hardware, using their
-released artifacts,\footnote{\url{https://github.com/spcl/confidential-llms-in-tees}}
-to assess whether the reported overhead bounds generalize beyond the specific platforms
-of the original study. The evaluation compares Intel SGX via the Gramine library OS and
+infrastructure configuration. This paper presents an independent reproduction of the
+CPU TEE results of Chrapek et al.~\cite{chrapek2025confidential}. Starting from the
+artifacts released by the authors,\footnote{\url{https://github.com/spcl/confidential-llms-in-tees}}
+we re-execute their measurement pipeline on public cloud infrastructure and assess
+whether the reported overhead bounds hold beyond the specific platforms on which they
+were established. The evaluation compares Intel SGX via the Gramine library OS and
 Intel TDX against a conventional VM baseline for Llama2 7B, across batch sizes of 1 and
 64 and input lengths of 128, 512, and 2048 tokens, with 30 repetitions per configuration.
 
@@ -160,11 +177,19 @@ This reproduction study is guided by the following research questions:
   diminish as batch size and input sequence length increase?
 \end{itemize}
 
-RQ1 tests whether the original study's central overhead bound generalizes to hardware
-distinct from the Intel Xeon platforms used by Chrapek et al. RQ2 tests whether the
-overhead-amortization trend reported in the original work reproduces in this
-environment. Section~\ref{sec:methodology} describes the experimental methodology, and
-Section~\ref{sec:results} reports how the collected evidence answers RQ1 and RQ2.
+RQ1 tests whether the original study's central overhead bound generalizes beyond the
+platforms on which it was established. The reproduction hardware is also Intel Xeon
+based, but differs in processor model, core count, and deployment model: 16-vCPU
+virtualized Azure instances rather than the dedicated Xeon Gold 6530 and Platinum 8580
+servers used by Chrapek et al. RQ2 tests whether the overhead-amortization trend
+reported in the original work reproduces in this environment.
+Section~\ref{sec:methodology} describes the experimental methodology,
+Section~\ref{sec:results} reports how the collected evidence answers RQ1 and RQ2,
+Section~\ref{sec:threats} examines the threats to the validity of these findings, and
+Section~\ref{sec:conclusion} summarizes the study's conclusions and outlines directions
+for future work. Section~\ref{sec:reproducibility} documents the published artifacts
+and how to reproduce this study, and a closing AI Usage Disclosure details the use of
+AI assistance in this work.
 
 % ---------------------------------------------------------------
 \section{Methodology}
@@ -174,7 +199,9 @@ Section~\ref{sec:results} reports how the collected evidence answers RQ1 and RQ2
 \label{sec:scope}
 
 This study re-executes the experiment of Chrapek et al.~\cite{chrapek2025confidential}
-using their released codebase, focusing on CPU TEE results for \textbf{Llama2 7B}~\cite{llama2}
+using a fork of their released codebase that fixes small bugs found during the
+reproduction,\footnote{\url{https://github.com/raissonsouto/confidential-llms-in-tees/tree/develop}}
+focusing on CPU TEE results for \textbf{Llama2 7B}~\cite{llama2}
 across three execution environments: a conventional VM (baseline), Intel SGX via
 Gramine~\cite{gramine}, and Intel TDX. GPU TEE experiments are not reproduced, as the
 CPU results constitute the primary empirical contribution of the original study. Batch
@@ -201,40 +228,68 @@ size, and input sequence length. Table~\ref{tab:factors} summarizes the factors 
   \end{tabular}
 \end{table}
 
-This yields $3 \times 2 \times 3 = 18$ configurations, each with \textbf{30 independent
-repetitions} ($540$ runs total). Output length is fixed at 128 tokens with greedy
-decoding. Overheads are computed relative to the VM baseline within each factor combination.
+Among these factors, \emph{batch size} deserves a brief explanation. The batch size is
+the number of input sequences the model processes concurrently in a single inference
+pass. Because the model weights must be streamed from memory once per generation step
+regardless of how many sequences are in flight, larger batches amortize that fixed
+memory-bandwidth cost across more sequences, increasing aggregate throughput
+(tokens/s). The price is paid in latency and memory: every request in the batch waits
+for the whole step to finish, and the per-sequence inference state --- most notably the
+KV cache, which grows linearly with batch size, beam width, and sequence
+length --- comes to dominate memory consumption at large batches~\cite{vllm}. The two
+levels studied here thus capture the two canonical serving regimes: batch size 1
+models interactive, latency-sensitive serving, while batch size 64 models
+throughput-oriented batch serving.
+
+This yields a planned experimental matrix of 18 configurations ($3 \times 2 \times 3 = 18$),
+each with 30 independent repetitions (540 runs total). As discussed in
+Section~\ref{sec:oom}, some configurations could not be completed because of memory
+limitations. Output length is fixed at 128 tokens, with greedy decoding at batch size 1
+and 4-beam search at batch size 64, following the benchmark defaults of the original
+artifacts. Overheads are computed relative to the VM baseline within each factor
+combination.
 
 \textbf{Independent variables:} execution environment (VM, SGX, TDX), batch size (1, 64),
 and input sequence length (128, 512, 2048 tokens).
 
-\textbf{Dependent variables:} throughput (tokens/s), next-token latency (ms), CPU
-utilization (\%), peak memory utilization (GB), and estimated cloud cost (\$/million
-tokens). Medians across repetitions are reported for all metrics.
-
-These variables directly instrument the two research questions from
-Section~\ref{sec:rqs}: throughput and latency, expressed as overhead relative to the VM
-baseline, instrument \textbf{RQ1}; their variation across the batch-size and
-input-length factor levels instruments \textbf{RQ2}.
+\textbf{Dependent variables:} throughput (tokens/s) and next-token latency (ms), which
+directly instrument the research questions from Section~\ref{sec:rqs}: expressed as
+overhead relative to the VM baseline, they instrument \textbf{RQ1}, and their variation
+across the batch-size and input-length factor levels instruments \textbf{RQ2}. Medians
+across repetitions are reported for both metrics.
 
 \subsection{Infrastructure and Software Stack}
 
-All environments run on Linux VMs with 16 vCPUs, 64\,GB RAM, and Ubuntu 24.04 LTS,
-provisioned via Scontain confidential computing infrastructure or Microsoft Azure. The software stack follows the original
-study~\cite{chrapek2025confidential}: IPEX~\cite{ipex}~2.x for inference, PyTorch~2.x
-with Hugging Face Transformers~4.x for model loading, Gramine~\cite{gramine} as the SGX
-runtime, and TCMalloc as the memory allocator. Llama2 7B is loaded in bfloat16 without
-quantization, with synthetic workloads generating at least 1,000 output tokens per
-repetition to obtain stable throughput estimates.
+All experiments run on two Microsoft Azure VMs from Intel-based confidential-computing
+families, summarized in Table~\ref{tab:vms}. The SGX machine is a
+\texttt{Standard\_DC16s\_v3} (DCsv3 family): 16 vCPUs on 3rd-generation Intel Xeon
+(Ice Lake) processors, 128\,GiB of RAM, and a 64\,GiB Enclave Page Cache (EPC). The TDX
+machine is a \texttt{Standard\_DC16es\_v6} (DCesv6 family) Confidential VM: 16 vCPUs on
+5th-generation Intel Xeon (Emerald Rapids) processors and 64\,GiB of RAM. Both run
+Ubuntu 24.04 LTS (the standard Generation 2 image on the SGX machine, the
+confidential-VM image on the TDX machine).
 
-\subsection{Differences from the Original Study}
+\begin{table}[t]
+  \caption{Azure VMs used in this reproduction.}
+  \label{tab:vms}
+  \small
+  \begin{tabular}{lll}
+    \toprule
+              & \textbf{SGX VM} & \textbf{TDX VM} \\
+    \midrule
+    Size      & \texttt{Standard\_DC16s\_v3} & \texttt{Standard\_DC16es\_v6} \\
+    Family    & DCsv3 & DCesv6 \\
+    vCPUs     & 16 & 16 \\
+    Memory    & 128\,GiB & 64\,GiB \\
+    CPU       & Ice Lake (3rd gen) & Emerald Rapids (5th gen) \\
+    TEE       & Intel SGX (64\,GiB EPC) & Intel TDX \\
+    OS        & Ubuntu 24.04 LTS (Gen2) & Ubuntu 24.04 LTS (CVM) \\
+    Serves as & VM baseline, SGX & TDX \\
+    \bottomrule
+  \end{tabular}
+\end{table}
 
-Table~\ref{tab:differences} summarizes the main differences between the original study
-and this reproduction. The narrower scope reflects resource availability rather than
-methodological disagreement; the selected configurations are sufficient to evaluate the
-original study's central performance claims.
-
-\begin{table*}[t]
+\begin{table*}[!b]
   \caption{Comparison between the original study and this reproduction.}
   \label{tab:differences}
   \small
@@ -256,32 +311,82 @@ original study's central performance claims.
     Data types & bfloat16 and int8 & bfloat16 only \\
     \midrule
     Hardware & Intel Xeon Gold 6530 (32 cores) and Intel Xeon Platinum 8580 (60 cores) &
-               Intel-compatible VM, 16 vCPUs, 64\,GB RAM \\
+               Azure \texttt{DC16s\_v3} (Ice Lake, 16 vCPUs, 128\,GiB) for baseline and SGX;
+               Azure \texttt{DC16es\_v6} (Emerald Rapids, 16 vCPUs, 64\,GiB) for TDX \\
     \midrule
-    Repetitions & Not specified & 30 per configuration \\
+    Repetitions & 50 per configuration & 30 per configuration \\
     \midrule
     GPU TEE evaluation & NVIDIA H100 NVL (Azure, $\approx$\$30K/month) & Not included \\
     \bottomrule
   \end{tabular}
 \end{table*}
 
-Results and analysis are presented in the subsequent sections.
+The conventional-VM baseline shares the SGX machine rather than occupying a third VM,
+because SGX is opt-in per process: \texttt{gramine-sgx} enters the enclave only for the
+workload it launches, so the same machine runs the same docker image with and without
+the TEE, and the SGX overhead is measured on identical hardware by construction. TDX,
+in contrast, encrypts the entire VM and cannot be disabled from inside a Confidential
+VM, so the TDX arm requires its own machine. The memory difference between the two VMs
+(128 vs. 64\,GiB, a consequence of the DCsv3 family's fixed 1:8 vCPU-to-memory ratio)
+does not affect the batch-1 measurements: Llama2 7B in bfloat16 ($\approx$14\,GB) fits
+comfortably in both VMs and within the SGX EPC, avoiding EPC paging. At batch size 64,
+however, memory becomes the binding constraint: the TDX VM's 64\,GiB (like the
+64\,GiB SGX enclave) is insufficient for 512-token inputs, and 2048-token inputs
+exceed even the 128\,GiB machine (Section~\ref{sec:oom}).
+
+The software stack follows the original study~\cite{chrapek2025confidential}:
+IPEX~\cite{ipex} for inference (2.3 on the baseline and TDX arms, and 2.2 on the SGX
+arm, whose Gramine-enabled image is built on that release), PyTorch~2.x with Hugging
+Face Transformers~4.x~\cite{transformers} for model loading, Gramine~\cite{gramine} as
+the SGX runtime, and
+TCMalloc as the memory allocator. The baseline and TDX arms are driven by the DeepSpeed
+launcher~\cite{deepspeed}, while the SGX arm uses the artifacts' single-instance
+execution path inside
+the enclave. Both paths run the same IPEX-optimized inference loop. Llama2 7B is loaded
+in bfloat16 without quantization.
+
+\subsection{Differences from the Original Study}
+
+Table~\ref{tab:differences} summarizes the main differences between the original study
+and this reproduction. The narrower scope reflects the available resources, the monetary
+cost of executing the full experimental matrix, and time constraints, rather than
+methodological disagreement. The selected configurations are sufficient to evaluate the
+original study's central performance claims.
+
+The differences are not limited to the experimental matrix: the fork
+(Section~\ref{sec:scope}) also diverges from the released artifact repository beyond
+the bug fixes summarized in Section~\ref{sec:key-findings}. First, the documentation
+is substantially expanded: the fork adds \texttt{AZURE.md}, a step-by-step runbook for
+provisioning the confidential-computing VMs (including quota, image, and Hugging Face
+license prerequisites), rewrites the top-level \texttt{README.md} as validated
+end-to-end instructions for each arm, and documents the SGX-specific pitfalls
+encountered (enclave sizing, offline model caching, required benchmark flags). Second,
+the raw experimental data is published in the repository itself --- the per-run
+benchmark logs of every arm, including failed runs, hardware snapshots
+(\texttt{lscpu}, \texttt{lshw}, \texttt{numactl}), and the consolidated
+\texttt{results.csv} --- whereas the original repository releases only the benchmark
+code, without measurement data; publishing the data alongside the code allows future
+reproductions to compare directly against both studies
+(Section~\ref{sec:reproducibility}). Third, the fork adds tooling absent from the
+original (a driver script for the SGX sweep, an Azure Retail Prices API query script,
+and a \texttt{config.env} template), pins the third-party dependencies as submodules
+at known-good revisions, and removes the components that are out of the reproduction's
+scope (the GPU and RAG benchmark trees and the INT8 quantization scripts).
+
 
 % ---------------------------------------------------------------
 \section{Results and Discussion}
 \label{sec:results}
 
-The measurement matrix described in Section~\ref{sec:methodology} has been executed on
-the Azure confidential-computing VMs: 13 of the 18 configurations completed all 30
-repetitions and were parsed into the consolidated CSV published with the artifacts
-(Section~\ref{sec:reproducibility}). The five missing cells are batch-64 runs with
-512-token (SGX, TDX) and 2048-token (all three environments) inputs, which were killed
-by out-of-memory conditions --- inside the SGX enclave
-(\texttt{DefaultCPUAllocator: can't allocate memory}) and by the host OOM killer for
-the baseline and TDX arms. Figures~\ref{fig:batch-scaling}, \ref{fig:overhead-trend},
-\ref{fig:cost-batches}, and~\ref{fig:cost-inputs} present the collected data.
-\textbf{[PLACEHOLDER]} Table~\ref{tab:overhead} and the interpretation paragraphs below
-remain to be finalized from the CSV.
+This section presents the results of reproducing the CPU TEE experiments of
+Chrapek et al.~\cite{chrapek2025confidential}. Throughput and next-token latency are
+analyzed to answer the research questions introduced in Section~\ref{sec:rqs}.
+Section~\ref{sec:results-rq1} evaluates whether CPU TEEs remain below the 10\%
+throughput overhead reported in the original study (RQ1),
+Section~\ref{sec:results-rq2} examines whether the relative overhead decreases with
+increasing batch size and input length (RQ2), Section~\ref{sec:oom} discusses
+configurations that could not be executed because of memory limitations, and
+Section~\ref{sec:key-findings} summarizes the main findings.
 
 \subsection{Throughput and Latency Overhead (RQ1)}
 \label{sec:results-rq1}
@@ -290,57 +395,56 @@ Table~\ref{tab:overhead} reports, for each of the 18 configurations (3 execution
 environments $\times$ 2 batch sizes $\times$ 3 input lengths, 30 repetitions each), the
 median throughput, median next-token latency, and the resulting overhead relative to
 the VM baseline within the same batch size/input length cell.
-Figure~\ref{fig:batch-scaling} shows the median throughput and relative overhead at
-128-token inputs --- the only input length at which all three environments completed
-both batch sizes.
-
-\begin{figure}[t]
-  \centering
-  \includegraphics[width=\linewidth]{batch_scaling_combined.png}
-  \caption{Median throughput at 128-token inputs, by batch size and execution
-  environment (30 repetitions; error bars span the observed range). Labels give the
-  throughput reduction of SGX and TDX relative to the VM baseline.}
-  \label{fig:batch-scaling}
-\end{figure}
+Figure~\ref{fig:batch-scaling} shows the median throughput at 128-token inputs, by
+batch size and execution environment.
 
 \begin{table*}[t]
   \caption{Median throughput, latency, and overhead relative to the VM baseline, by
-  configuration (\textbf{TBD}: pending experiment execution).}
+  configuration; OOM: out of memory.}
   \label{tab:overhead}
   \small
-  \begin{tabular}{llccccc}
+  \begin{tabular}{llcccc}
     \toprule
     \textbf{Environment} & \textbf{Batch} & \textbf{Input (tok)} & \textbf{Throughput (tok/s)} & \textbf{Latency (ms)} & \textbf{Overhead (\%)} \\
     \midrule
-    \multirow{6}{*}{VM (baseline)} & \multirow{3}{*}{1}  & 128  & TBD & TBD & --- \\
-                                    &                     & 512  & TBD & TBD & --- \\
-                                    &                     & 2048 & TBD & TBD & --- \\
-                                    & \multirow{3}{*}{64} & 128  & TBD & TBD & --- \\
-                                    &                     & 512  & TBD & TBD & --- \\
-                                    &                     & 2048 & TBD & TBD & --- \\
+    \multirow{6}{*}{VM (baseline)} & \multirow{3}{*}{1}  & 128  & 7.96  & 113.3  & --- \\
+                                    &                     & 512  & 6.87  & 116.6  & --- \\
+                                    &                     & 2048 & 4.11  & 125.7  & --- \\
+                                    & \multirow{3}{*}{64} & 128  & 16.15 & 3572.5 & --- \\
+                                    &                     & 512  & 10.88 & 4197.0 & --- \\
+                                    &                     & 2048 & \multicolumn{3}{c}{OOM} \\
     \midrule
-    \multirow{6}{*}{SGX (Gramine)}  & \multirow{3}{*}{1}  & 128  & TBD & TBD & TBD \\
-                                    &                     & 512  & TBD & TBD & TBD \\
-                                    &                     & 2048 & TBD & TBD & TBD \\
-                                    & \multirow{3}{*}{64} & 128  & TBD & TBD & TBD \\
-                                    &                     & 512  & TBD & TBD & TBD \\
-                                    &                     & 2048 & TBD & TBD & TBD \\
+    \multirow{6}{*}{SGX (Gramine)}  & \multirow{3}{*}{1}  & 128  & 5.38  & 172.0  & 32.4 \\
+                                    &                     & 512  & 4.76  & 176.0  & 30.7 \\
+                                    &                     & 2048 & 3.05  & 190.1  & 25.8 \\
+                                    & \multirow{3}{*}{64} & 128  & 13.63 & 4219.9 & 15.6 \\
+                                    &                     & 512  & \multicolumn{3}{c}{OOM} \\
+                                    &                     & 2048 & \multicolumn{3}{c}{OOM} \\
     \midrule
-    \multirow{6}{*}{TDX}            & \multirow{3}{*}{1}  & 128  & TBD & TBD & TBD \\
-                                    &                     & 512  & TBD & TBD & TBD \\
-                                    &                     & 2048 & TBD & TBD & TBD \\
-                                    & \multirow{3}{*}{64} & 128  & TBD & TBD & TBD \\
-                                    &                     & 512  & TBD & TBD & TBD \\
-                                    &                     & 2048 & TBD & TBD & TBD \\
+    \multirow{6}{*}{TDX}            & \multirow{3}{*}{1}  & 128  & 5.93  & 154.0  & 25.5 \\
+                                    &                     & 512  & 4.53  & 158.3  & 34.1 \\
+                                    &                     & 2048 & 2.28  & 173.8  & 44.5 \\
+                                    & \multirow{3}{*}{64} & 128  & 12.06 & 4358.4 & 25.3 \\
+                                    &                     & 512  & \multicolumn{3}{c}{OOM} \\
+                                    &                     & 2048 & \multicolumn{3}{c}{OOM} \\
     \bottomrule
   \end{tabular}
 \end{table*}
 
-\textbf{[PLACEHOLDER --- RQ1 interpretation]} Once populated, this paragraph will state
-whether the overhead column in Table~\ref{tab:overhead} stays below the 10\% bound
-reported by Chrapek et al.~\cite{chrapek2025confidential} for both Intel SGX and Intel
-TDX on this reproduction's hardware, or whether it exceeds that bound, directly
-answering RQ1.
+The evaluated configurations do not reproduce the throughput overhead bounds reported
+in the original study for either TEE. For TDX, throughput overhead relative to the VM
+baseline ranges from 25.3\% to 44.5\% across the four measurable configurations
+(Table~\ref{tab:overhead}), well above the 10\% bound reported by
+Chrapek et al.~\cite{chrapek2025confidential}. Next-token latency shows the same
+picture (e.g., 154.0 vs. 113.3\,ms at batch 1 with 128-token inputs, +36\%, against the
+original study's $<$20\% latency bound). Part of the TDX gap may be attributable to the
+platform rather than to TDX itself, since that arm runs on a different machine and CPU
+generation than the baseline (Section~\ref{sec:threats}). The SGX arm, however, settles
+the question without that confound: measured against the baseline on the very same
+machine, SGX still exceeds the bound, with 32.4\%, 30.7\%, and 25.8\% throughput
+overhead at batch 1 for 128-, 512-, and 2048-token inputs, 15.6\% at the single
+batch-64 cell that completed, and next-token latency overhead around +51\% at batch 1
+(172.0 vs. 113.3\,ms at 128 tokens).
 
 \subsection{Effect of Batch Size and Input Length (RQ2)}
 \label{sec:results-rq2}
@@ -352,134 +456,179 @@ answering RQ1.
   input length (columns), and batch size (rows). Annotations give median relative
   throughput differences between environments. Batch-64 panels at 512 and 2048 input
   tokens are marked OOM: fewer than three environments completed
-  (Section~\ref{sec:results}).}
+  (Section~\ref{sec:oom}).}
   \label{fig:overhead-trend}
 \end{figure*}
 
-Figure~\ref{fig:overhead-trend} shows the throughput distributions across the full
-factor space, generated from the consolidated CSV by the scripts in
-\texttt{CPU/processing/}.
+The two TEEs diverge. For TDX, relative throughput overhead \emph{grows} with input
+length at batch size 1 (25.5\% at 128 tokens, 34.1\% at 512, and 44.5\% at 2048), and
+the single measurable batch-64 cell (128-token inputs, 25.3\%) sits at the same level
+as its batch-1 counterpart rather than below it. On this evidence, the
+overhead-amortization trend does not reproduce for TDX in this environment. For SGX, in
+contrast, overhead \emph{shrinks} with input length (32.4\% $\rightarrow$ 30.7\%
+$\rightarrow$ 25.8\%) and drops to 15.6\% at the single measurable batch-64 cell, less
+than half its batch-1 counterpart, which is consistent with the original study's
+amortization claim, although the levels remain well above the original bounds.
+Figure~\ref{fig:overhead-trend} consolidates both trends across the full factor space.
 
-\textbf{[PLACEHOLDER --- RQ2 interpretation]} Once populated, this paragraph will state
-whether Figure~\ref{fig:overhead-trend} shows the overhead-amortization trend reported
-in the original study --- i.e., relative overhead shrinking as batch size and input
-length grow --- or whether the trend does not reproduce on this hardware, directly
-answering RQ2.
+\subsection{Infeasible Configurations at Batch Size 64}
+\label{sec:oom}
 
-\subsection{Estimated Cost}
-\label{sec:results-cost}
+Five of the eighteen configurations proved infeasible, all at batch size 64. On the TDX
+VM (64\,GiB), the 512-token configuration was terminated by the Linux kernel's
+out-of-memory (OOM) killer on two independent attempts, both $\approx$15 minutes into
+the run during the prefill of the first warmup iterations, with the inference process
+holding $\approx$59\,GiB of anonymous resident memory. On the 128\,GiB baseline
+machine, the 2048-token configuration was likewise OOM-killed ($\approx$123\,GiB
+resident, of $\approx$187\,GiB of requested virtual memory), which rules out that input
+length for all three environments at this batch size: the TDX VM is strictly smaller,
+and the SGX arm runs on the same 128\,GiB host. The corresponding cells of
+Table~\ref{tab:overhead} are marked OOM. The 512-token configuration did complete on
+the baseline machine. Under SGX it faces a third, distinct memory ceiling: the Gramine
+manifest sizes the enclave to the 64\,GiB EPC, and the 512-token runs at batch size 64
+failed with allocation errors inside the enclave
+(\texttt{DefaultCPUAllocator: can't allocate memory}), while the 128-token runs
+completed.
 
-\begin{figure}[t]
-  \centering
-  \includegraphics[width=\linewidth]{azure_price.png}
-  \caption{Azure pay-as-you-go pricing efficiency (vCPUs per US\$ per hour) of the two
-  VM families used, fetched from the Azure Retail Prices API: DCsv3 (baseline and SGX
-  arms) and DCesv6 (TDX arm).}
-  \label{fig:azure-price}
-\end{figure}
-
-\begin{figure}[t]
-  \centering
-  \includegraphics[width=\linewidth]{vCPUs_GPU_EMR_batches.png}
-  \caption{Measured throughput (top) and estimated cost per million generated tokens
-  (bottom) at 128-token inputs, by batch size, using the original artifact's Azure cost
-  model (per-vCPU and per-GB-of-RAM hourly rates). The horizontal line is the
-  confidential H100 (cGPU) estimate from the same model.}
-  \label{fig:cost-batches}
-\end{figure}
-
-\begin{figure*}[t]
-  \centering
-  \includegraphics[width=0.85\textwidth]{vCPUs_GPU_EMR_inputs.png}
-  \caption{Measured throughput (top) and estimated cost per million generated tokens
-  (bottom) at batch size 1, by input length, using the same cost model as
-  Figure~\ref{fig:cost-batches}.}
-  \label{fig:cost-inputs}
-\end{figure*}
-
-Figures~\ref{fig:cost-batches} and~\ref{fig:cost-inputs} combine the measured
-throughput with the original artifact's cost model to estimate the cost of generating
-one million tokens in each environment; Figure~\ref{fig:azure-price} shows the
-pricing efficiency of the two VM families, for context on the price asymmetry between
-the SGX- and TDX-capable instances. \textbf{[PLACEHOLDER --- cost interpretation]}
-Once finalized, this paragraph will discuss whether CPU TEEs remain cost-competitive
-with the confidential-GPU reference at low batch sizes, as claimed by the original
-study.
+This infeasibility is a reproduction finding in its own right. The model itself
+($\approx$14\,GB in bfloat16) is not the constraint: at batch size 64 the benchmark
+uses 4-beam search, so the KV cache and prefill activation buffers scale with batch
+$\times$ beams $\times$ sequence length and dominate memory consumption. That the
+512-token case fits in 128\,GiB but not in the TDX VM's 64\,GiB follows directly from
+Azure's confidential-VM sizing: the DCesv6 family provides a fixed 1:4 vCPU-to-memory
+ratio (16 vCPUs $\rightarrow$ 64\,GiB), versus 1:8 for DCsv3. The practical consequence
+is that the large-batch, long-input regime in which the original study reports the
+strongest overhead amortization (with batch sizes up to 512) is not reachable at the
+VM sizes used in this reproduction.
 
 \subsection{Key Findings}
 \label{sec:key-findings}
 
-\textbf{[PLACEHOLDER --- to be completed once data collection finishes]}
 \begin{itemize}
-  \item \textbf{RQ1:} TBD --- whether the $<$10\% throughput overhead bound holds for
-  both SGX and TDX on independent hardware.
-  \item \textbf{RQ2:} TBD --- whether relative overhead diminishes with larger batch
-  sizes and longer input sequences, consistent with the original study.
+  \item \textbf{RQ1:} the $<$10\% bound on throughput overhead does \emph{not} hold in
+  this reproduction. TDX shows 25.3--44.5\% (subject to the confound of two CPU
+  generations, Section~\ref{sec:threats}) and SGX, measured on the same machine as its
+  baseline and therefore confound-free, shows 25.8--32.4\% at batch 1 and 15.6\% at
+  batch 64.
+  \item \textbf{RQ2:} the TEEs diverge. TDX overhead \emph{increases} with input length
+  at batch 1 (25.5\% $\rightarrow$ 44.5\%) and does not decrease at batch 64,
+  contradicting the amortization trend of the original study, while SGX overhead
+  decreases with input length (32.4\% $\rightarrow$ 25.8\%) and with batch size (15.6\%
+  at batch 64), consistent with it.
+  \item \textbf{Feasibility:} at batch size 64, memory is the binding constraint:
+  512-token inputs exceed the TDX CVM's 64\,GiB and the 64\,GiB SGX enclave, and
+  2048-token inputs exceed even the 128\,GiB baseline/SGX machine
+  (Section~\ref{sec:oom}). The large-batch factor space of the original study is not
+  fully reachable at these Azure VM sizes.
 \end{itemize}
 
 % ---------------------------------------------------------------
 \section{Threats to Validity}
 \label{sec:threats}
 
-\textbf{Internal validity.} Measurements are taken on shared cloud/virtualized
-infrastructure (Scontain or Microsoft Azure), so noisy-neighbor effects from co-located
-tenants and CPU frequency/turbo-boost variability across repetitions could inflate
-variance independent of the TEE mechanism under test. This is mitigated by taking 30
-repetitions per configuration and reporting medians, and by pinning all environments to
-the same Docker image (\texttt{ipex-llm:2.3.100}) and the same 16-vCPU core binding, so
-that software version drift does not confound the environment factor.
+\textbf{Internal validity.} Measurements are taken on shared, virtualized cloud
+infrastructure (Microsoft Azure), so noisy-neighbor effects from co-located tenants and
+CPU frequency/turbo-boost variability across repetitions could inflate variance
+independent of the TEE mechanism under test. This is mitigated by taking 30 repetitions
+per configuration and reporting medians, and by pinning the same 16-vCPU core binding
+everywhere and the same Docker image (\texttt{ipex-llm:2.3.100}) on the baseline and
+TDX arms. The SGX arm cannot share that image: following the original artifacts, it
+runs the Gramine-enabled \texttt{sgx-ipex-llm:2.2.0} image, built on IPEX 2.2 rather
+than 2.3, a software-version difference that partially confounds the SGX-vs-baseline
+comparison. A residual confound remains for TDX: because TDX cannot be disabled from
+inside a Confidential VM, its overhead is computed against the VM baseline measured on
+the Ice Lake SGX machine, so the TDX-vs-baseline comparison spans two CPU generations
+(Table~\ref{tab:vms}). The SGX-vs-baseline comparison is free of this confound, since
+both arms share the same machine. The TDX VM's smaller memory additionally truncates
+the TDX factor space at batch 64 (Section~\ref{sec:oom}), so the
+batch-size/input-length interaction can only be compared across all three environments
+for the configurations that fit in 64\,GiB.
 
-\textbf{External validity.} The reproduction hardware (a 16-vCPU, 64\,GB VM on Scontain
-or Azure) differs from the original study's Intel Xeon Gold 6530 and Platinum 8580
-server platforms, which may have different SGX EPC sizes, TDX virtualization stacks, and
-AMX/AVX-512 microarchitectural behavior even with AMX disabled. The factor space is also
-narrower than the original study's, as summarized in Table~\ref{tab:differences}: only
-Llama2 7B is evaluated (no 13B/70B, Llama3, Mistral, or Gemma), no bare-metal baseline is
-included, and GPU TEEs are out of scope. Conclusions drawn here therefore generalize to
-this specific model size and hardware class, not to the full space covered by the
-original study.
+\textbf{External validity.} The reproduction hardware (the two 16-vCPU Azure VMs of
+Table~\ref{tab:vms}) differs from the original study's Intel Xeon Gold 6530 and
+Platinum 8580 server platforms, which may have different SGX EPC sizes, TDX
+virtualization stacks, and AMX/AVX-512 microarchitectural behavior even with AMX
+disabled. The factor space is also narrower than the original study's, as summarized in
+Table~\ref{tab:differences}: only Llama2 7B is evaluated (no 13B/70B, Llama3, Mistral,
+or Gemma), no bare-metal baseline is included, and GPU TEEs are out of scope.
+Conclusions drawn here therefore generalize to this specific model size and hardware
+class, not to the full space covered by the original study.
 
 \textbf{Construct validity.} Throughput and next-token latency are used as proxies for
-``performance overhead,'' following the original study's definition; reporting only
+``performance overhead,'' following the original study's definition. Reporting only
 medians across 30 repetitions may obscure tail-latency behavior that matters for
-latency-sensitive deployments. The synthetic, fixed-length workloads (128/512/2048 input
-tokens, 128 output tokens, greedy decoding) may not reflect the input-length
+latency-sensitive deployments. The synthetic, fixed-length workloads (128/512/2048
+input tokens, 128 output tokens, greedy decoding) may not reflect the input-length
 distribution or decoding strategy of production LLM serving traffic.
 
-\textbf{Conclusion validity.} \textbf{[PLACEHOLDER]} This paragraph will state whether
-overhead differences between environments are assessed with a formal statistical test
-(e.g., a non-parametric test across the 30 repetitions) or only via descriptive medians;
-if the latter, that is noted here as a limitation on the strength of the RQ1/RQ2
-conclusions.
+\textbf{Conclusion validity.} This study reports descriptive statistics (medians) over
+30 repetitions for each configuration but does not apply formal hypothesis testing to
+assess whether the observed differences between execution environments are
+statistically significant. Consequently, the conclusions regarding RQ1 and RQ2 should
+be interpreted as evidence based on the observed magnitude and consistency of the
+measured overheads rather than on statistical inference. Future work could complement
+this analysis with non-parametric statistical tests and confidence intervals to
+quantify the significance and variability of the observed differences.
 
 % ---------------------------------------------------------------
 \section{Conclusion}
 \label{sec:conclusion}
 
-This paper set out to reproduce the CPU TEE performance evaluation of
-Chrapek et al.~\cite{chrapek2025confidential} on hardware independent from the original
-study, comparing Intel SGX (via Gramine) and Intel TDX against a conventional VM
-baseline for Llama2 7B inference across a range of batch sizes and input lengths.
-\textbf{[PLACEHOLDER --- RQ verdict]} Once the measurement matrix in
-Section~\ref{sec:results} is complete, this paragraph will state whether RQ1's $<$10\%
-throughput overhead bound and RQ2's overhead-amortization trend hold on independent
-hardware, and will discuss the implications for practitioners deciding between SGX- and
-TDX-based confidential LLM deployments.
+This paper reproduced the CPU Trusted Execution Environment (TEE) evaluation of
+Chrapek et al.~\cite{chrapek2025confidential} on independent Azure hardware, comparing
+Intel SGX (via Gramine) and Intel TDX against a conventional VM baseline for Llama2 7B
+inference. The results indicate that the original study's reported throughput overhead
+bound of less than 10\% does not reproduce in the evaluated environment. Measured
+throughput overhead ranges from 15.6--32.4\% for SGX and from 25.3--44.5\% for TDX.
+Furthermore, the overhead amortization trend reported in the original work is
+reproduced for SGX but not for TDX under the evaluated configurations.
 
-Beyond the specific overhead figures, this reproduction contributes an independent data
-point on the hardware-sensitivity of confidential-computing performance claims for LLM
-inference --- a question of practical importance given how frequently such workloads are
-deployed on infrastructure the original researchers never had access to. Future work
-includes extending this reproduction to the GPU TEE scenario (NVIDIA H100 confidential
-computing) and to larger model sizes (13B, 70B), both left out of the present scope for
-resource reasons (Table~\ref{tab:differences}).
+The reproduction also revealed practical deployment limitations that were not evident
+from the original study. Several large-batch configurations exceeded the available
+memory of the Azure confidential VM instances, preventing the evaluation of part of the
+experimental matrix. In addition, reproducing the experiments required correcting
+issues in the released artifacts, including repository configuration and execution
+scripts, which are documented in the accompanying fork.
+
+The evidence collected so far supports the following key findings:
+
+\begin{itemize}
+  \item \textbf{TEE overheads far exceed the original bounds.} Measured throughput
+  overhead is 25.3--44.5\% for TDX and 15.6--32.4\% for SGX (vs. the original
+  $<$10\%), with next-token latency overheads at batch 1 of roughly +51\% (SGX) and
+  +36\% (TDX) against the original $<$20\%. The SGX result is measured on the same
+  machine as its baseline and is therefore free of the cross-generation confound of
+  Section~\ref{sec:threats}.
+  \item \textbf{Amortization reproduces only for SGX.} At batch size 1, TDX overhead
+  increases monotonically with input length (25.5\% $\rightarrow$ 34.1\% $\rightarrow$
+  44.5\%), contradicting the amortization trend of the original study, while SGX
+  overhead decreases with input length (32.4\% $\rightarrow$ 30.7\% $\rightarrow$
+  25.8\%) and with batch size (15.6\% at batch 64), consistent with it.
+  \item \textbf{Memory, not compute, bounds the factor space.} At batch size 64 the
+  benchmark's 4-beam search makes memory the binding constraint, with three distinct
+  ceilings (the TDX CVM's 64\,GiB, the baseline host's 128\,GiB, and the 64\,GB SGX
+  enclave), rendering the original study's large-batch regime unreachable at these
+  Azure VM sizes.
+  \item \textbf{The released artifacts required fixes to reproduce.} Missing submodule
+  gitlinks, a non-recursive glob in the results parser, and a whitespace-corrupted
+  patch that broke the SGX+IPEX path all had to be repaired. The fixes are collected in
+  the fork cited in Section~\ref{sec:scope}.
+\end{itemize}
+
+Overall, these results reinforce the importance of independent reproduction studies in
+systems research. They show that the performance of confidential LLM inference is
+sensitive to hardware generation, virtualization environment, software stack, and
+available memory resources. Future work includes extending the evaluation to GPU TEEs,
+larger language models, and additional cloud platforms, as well as incorporating
+statistical analyses to better characterize the variability of the observed overheads.
 
 % ---------------------------------------------------------------
 \section{Reproducibility}
 \label{sec:reproducibility}
 
-All artifacts of this reproduction are public in a fork of the original study's
-repository:
+All artifacts of this reproduction are public, following the availability criteria of
+the ACM artifact review and badging policy~\cite{acm_badging}, in a fork of the
+original study's repository:
 \begin{center}
   \url{https://github.com/raissonsouto/confidential-llms-in-tees} (branch \texttt{develop})
 \end{center}
@@ -498,8 +647,11 @@ Section~\ref{sec:results} together with the plotting scripts
 (\texttt{CPU/processing/}) that produce them. The \LaTeX{} source of this paper is
 in \texttt{paper/}. Runs that failed
 (e.g., out-of-memory at batch~64 with long inputs) are published as-is, since the
-failure modes are themselves findings.
+failure modes are themselves findings. Note that the original study's repository
+releases only the benchmark code; the raw measurement data published here is intended
+to let future reproductions compare their numbers directly against both studies.
 
+\begin{sloppypar}
 \textbf{How to reproduce.} (1)~Provision the two VMs following \texttt{AZURE.md};
 (2)~on each VM, follow the \texttt{README.md} common setup (clone, initialize
 submodules, apply patches, run \texttt{host\_setup.sh}, and build the Docker image);
@@ -507,6 +659,7 @@ submodules, apply patches, run \texttt{host\_setup.sh}, and build the Docker ima
 \texttt{./run.sh tdx}, and the SGX arm with \texttt{sgx\_setup.sh} followed by
 \texttt{run\_sgx\_sweep.sh} (from \texttt{CPU/}); (4)~parse the logs with
 \texttt{run\_parser.py} to obtain the CSV used in the analysis.
+\end{sloppypar}
 
 \textbf{Required resources.} Two Azure VMs: \texttt{Standard\_DC16s\_v3}
 (16~vCPUs, 128\,GB, Ice Lake; hosts the baseline and SGX arms) and
