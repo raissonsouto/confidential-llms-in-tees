@@ -191,6 +191,26 @@ Each writes one PNG directly to `results/` (`overall_single_socket.png`,
 outbound network access (it queries `prices.azure.com` live instead of using
 hardcoded prices); the other four are offline and only need `results.csv`.
 
+#### Statistical analysis (medians, bootstrap CIs, Mann-Whitney U)
+
+`processing/overhead_stats.py` reproduces the numbers in the paper's overhead
+table: per-configuration median throughput/latency with 95% bootstrap
+confidence intervals (10,000 resamples), and a two-sided Mann-Whitney U test
+of each TEE against the VM baseline at the same batch-size/input-length cell.
+It needs `results.csv` (from `run_parser.py` above) and the raw log
+directory (`results/`, with the `baseline/`, `sgx/`, `tdx/` subfolders) to
+recover the per-cell prefill cost used to reconstruct next-token latency:
+
+```sh
+pip install pandas numpy scipy
+python3 CPU/processing/overhead_stats.py results/results.csv results
+```
+
+Run from the repository root. The bootstrap uses a fixed RNG seed, so the
+output is deterministic across runs. No Azure access is needed: this script
+only reads the already-published `results/` data, so it reproduces the
+paper's confidence intervals and $p$-values without re-running any benchmark.
+
 ### Tracing
 To obtain traces, start the Docker container:
 ```
