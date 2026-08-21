@@ -4,7 +4,7 @@
 #
 #     ./benchmark_vllm.sh gpu             # baseline H100
 #     ./benchmark_vllm.sh cgpu            # H100 with TDX + GPU CC mode
-#     ./benchmark_vllm.sh cgpu --smoke    # only batch 64 / input 2048
+#     ./benchmark_vllm.sh cgpu --smoke    # only batch 1 / input 128
 #
 # The grid matches the CPU reproduction (CPU/run.sh) so the two tracks are
 # directly comparable: batch 1/64 x input 128/512/2048, 128 output tokens,
@@ -40,18 +40,22 @@ if [ ! -f "$BENCH" ]; then
 fi
 
 # Llama-2-7B uses MHA, so its KV cache is ~0.5 MB/token: batch 64 x (2048+128)
-# tokens needs ~68 GB on top of ~13.5 GB of weights, which does not fit an 80 GB
-# H100 at vLLM's default utilisation of 0.9. Raising it to 0.95 and capping the
-# context at exactly what the sweep needs buys back enough KV cache to matter.
-# If the batch still has to be split across scheduler waves, the per-config log
-# records it (see the "KV cache" grep below) so the cell can be reported
-# honestly rather than as a clean batch of 64.
+# tokens needs ~68 GB on top of ~13.5 GB of weights, against an 80 GB H100.
+# That cell may not fit, and if it OOMs or gets split across scheduler waves
+# that is a measurement result worth reporting -- the CPU track records OOM
+# cells the same way -- not something to engineer around. These settings are
+# recorded per run and overridable, and the "KV cache" grep below captures what
+# vLLM actually managed, so the outcome is evidenced either way.
 GPU_MEM_UTIL="${GPU_MEM_UTIL:-0.95}"
 MAX_MODEL_LEN="${MAX_MODEL_LEN:-2176}"
 
 if [ "$SMOKE" = "1" ]; then
-    INPUT_LENS=(2048)
-    BATCHES=(64)
+    # Smallest cell in the grid. The smoke test exists to prove the pipeline
+    # works -- driver, CC mode, vLLM, weights, JSON output -- for the least
+    # GPU time possible, so it deliberately uses the cheapest configuration
+    # rather than the heaviest one.
+    INPUT_LENS=(128)
+    BATCHES=(1)
 else
     INPUT_LENS=(128 512 2048)
     BATCHES=(1 64)
