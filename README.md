@@ -26,8 +26,6 @@ Repository to include scripts to run inference benchmarks in CC environments.
       - [Statistical analysis (medians, bootstrap CIs, Mann-Whitney U)](#statistical-analysis-medians-bootstrap-cis-mann-whitney-u)
     - [Tracing](#tracing)
   - [GPUs](#gpus)
-    - [Pre-flight check](#pre-flight-check)
-    - [Provisioning the VMs](#provisioning-the-vms)
     - [VM setup](#vm-setup)
     - [Smoke test](#smoke-test)
     - [Running the GPU sweep](#running-the-gpu-sweep)
@@ -255,64 +253,34 @@ output tokens, Llama-2-7B in bfloat16, 10 warmups and 30 measured iterations
 per configuration. Inference is served by [vLLM](https://github.com/vllm-project/vllm),
 pinned to `v0.9.2`, and driven through its `benchmarks/benchmark_latency.py`.
 
-Both VMs are Google Cloud `a3-highgpu-1g` instances — see
-[GOOGLE_CLOUD.md](GOOGLE_CLOUD.md) for provisioning. Two instances are needed
+Both VMs are Google Cloud `a3-highgpu-1g` instances. Two instances are needed
 because GPU CC mode is fixed at instance creation and cannot be toggled from
 inside the guest, so unlike the Azure SGX VM, one machine cannot host both arms.
 
 > [!IMPORTANT]
-> `a3-highgpu-1g` is offered **only** as a Spot (or flex-start) instance, and
-> Confidential VM with TDX cannot use reservations. Both arms are therefore
-> preemptible, and at roughly $10/hour each. Work through the pre-flight check
-> and the smoke test before starting the full sweep — they exist to move
-> failures off the clock.
+> **Start with [GOOGLE_CLOUD.md](GOOGLE_CLOUD.md).** It covers the pre-flight
+> check, quota, and creating both VMs. This section picks up from there and
+> assumes the instance already exists and the pre-flight passed.
 
-### Pre-flight check
-
-Verifies the whole environment before anything bills: required binaries,
-gcloud authentication and project, Compute Engine API, the IAM permissions
-needed to create and delete an instance, H100 spot quota in all three
-supported regions, machine-type and image availability, and — the one most
-likely to bite — that your Hugging Face token actually has access to the gated
-Llama-2 repo.
-
-```sh
-cp config.env .env     # fill in HUGGINGFACE_TOKEN and GCP_PROJECT
-cd GPU
-./preflight.sh
-```
-
-It creates nothing and exits non-zero on the first problem. Don't provision
-until it exits 0.
-
-### Provisioning the VMs
-
-Follow [GOOGLE_CLOUD.md](GOOGLE_CLOUD.md#baseline-gpu-vm). In short, from the
-repo root with `.env` loaded:
-
-```sh
-source .env
-gcloud compute instances create $CGPU_VM_NAME \
-  --zone=$GCP_ZONE --machine-type=$GPU_MACHINE_TYPE \
-  --confidential-compute-type=TDX \
-  --provisioning-model=SPOT --instance-termination-action=STOP \
-  --maintenance-policy=TERMINATE \
-  --image-project=$GPU_IMAGE_PROJECT --image-family=$GPU_IMAGE_FAMILY \
-  --boot-disk-size=$GPU_BOOT_DISK_SIZE --boot-disk-type=pd-balanced
-```
-
-Drop `--confidential-compute-type=TDX` for the baseline VM. Everything else
-about the two instances is identical on purpose, so the TEE is the only
-variable.
+`a3-highgpu-1g` is offered only as a Spot (or flex-start) instance, and
+Confidential VM with TDX cannot use reservations, so both arms are preemptible
+at roughly $10/hour each. Run the smoke test before the full sweep — it exists
+to move failures off the clock.
 
 ### VM setup
 
+Starting point: the instance exists and
+[GOOGLE_CLOUD.md](GOOGLE_CLOUD.md#pre-flight-check)'s pre-flight passed.
+
 Copy the repo across and run the setup script on the instance. It installs the
 NVIDIA driver (580+, required for CC mode), enables the LKCA and persistence
-settings CC mode needs, installs vLLM, downloads the weights, and captures a
-hardware snapshot:
+settings CC mode needs, installs vLLM (pinned, with a matching `transformers`),
+downloads the weights, verifies CUDA can initialise, and captures a hardware
+snapshot:
 
 ```sh
+source .env      # GCP_ZONE, CGPU_VM_NAME, GPU_VM_NAME
+
 gcloud compute scp --recurse --zone=$GCP_ZONE GPU .env \
   $CGPU_VM_NAME:~/confidential-llms-in-tees/
 gcloud compute ssh $CGPU_VM_NAME --zone=$GCP_ZONE
@@ -320,6 +288,9 @@ gcloud compute ssh $CGPU_VM_NAME --zone=$GCP_ZONE
 cd ~/confidential-llms-in-tees/GPU
 ./gcp_vm_setup.sh cgpu     # reboots once; reconnect and re-run to finish
 ```
+
+The script is resumable and reboots when it has to, so re-running it after each
+reboot is the normal path, not a workaround.
 
 Pass `gpu` instead of `cgpu` on the baseline VM — it then skips the CC-mode
 changes and leaves the machine stock, so it stays a clean control.

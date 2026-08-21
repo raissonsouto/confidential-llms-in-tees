@@ -286,18 +286,14 @@ things inside the guest, all handled by `gcp_vm_setup.sh`:
    sudo systemctl daemon-reload
    ```
 
-Then reboot and copy the repo across:
-
-```sh
-gcloud compute scp --recurse --zone=$GCP_ZONE \
-  GPU .env $CGPU_VM_NAME:~/confidential-llms-in-tees/
-gcloud compute ssh $CGPU_VM_NAME --zone=$GCP_ZONE
-cd ~/confidential-llms-in-tees/GPU
-./gcp_vm_setup.sh cgpu     # reboots once; re-run afterwards to finish
-```
+All three are applied for you by `gcp_vm_setup.sh`, which is where the
+benchmark procedure in [README.md](README.md#vm-setup) starts. **This document
+ends here**: once both instances exist and the pre-flight is green, continue
+in the README.
 
 > [!IMPORTANT]
-> Verify the TEE is actually on before spending any GPU time on measurements:
+> Whichever way you set the VM up, verify the TEE is actually on before
+> spending any GPU time on measurements:
 > ```sh
 > sudo nvidia-smi conf-compute -f     # must print: CC status: ON
 > sudo nvidia-smi conf-compute -grs   # Confidential Compute GPUs Ready state: ready
