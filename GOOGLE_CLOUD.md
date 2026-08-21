@@ -13,6 +13,8 @@ the actual benchmark setup and execution is covered in the main
   - [Prerequisites](#prerequisites)
   - [Configuration](#configuration)
   - [Pre-flight check](#pre-flight-check)
+    - [Automated](#automated)
+    - [Manual](#manual)
   - [Checking quota before you provision](#checking-quota-before-you-provision)
   - [Baseline GPU VM](#baseline-gpu-vm)
   - [Confidential GPU VM](#confidential-gpu-vm)
@@ -99,11 +101,19 @@ source .env
 ## Pre-flight check
 
 H100 spot time bills by the second, so every condition that could make a run
-fail late is worth checking first, on the ground, at zero cost. `preflight.sh`
-does that — binaries, gcloud authentication, project visibility, Compute Engine
-API, the specific IAM permissions needed to create and delete an instance,
-quota in all three supported regions, machine-type and image availability,
-`TDX_CAPABLE` on the image, and Hugging Face access to the gated Llama-2 repo:
+fail late is worth checking first, on the ground, at zero cost. Do not
+provision until the environment checks out.
+
+There are two ways to do this: run the script, or work through the same checks
+by hand.
+
+### Automated
+
+`preflight.sh` covers all of it — binaries, gcloud authentication, project
+visibility, Compute Engine API, the specific IAM permissions needed to create
+and delete an instance, quota in all three supported regions, machine-type and
+image availability, `TDX_CAPABLE` on the image, Hugging Face access to the
+gated Llama-2 repo, and GitHub authentication:
 
 ```sh
 cd GPU
@@ -111,14 +121,61 @@ cd GPU
 ```
 
 It creates nothing and exits non-zero with an actionable message on the first
-problem. Do not provision until it exits 0.
+problem.
 
-> [!IMPORTANT]
-> The Hugging Face check is the highest-value one in the script. A token that
-> authenticates fine but whose owner has not accepted Meta's licence returns
-> **403** on the model download — and the natural place to discover that is
-> twenty minutes into setting up a running $10/hour GPU. See
-> [Hugging Face access token](README.md#hugging-face-access-token).
+### Manual
+
+The same checks, one at a time, if you would rather see each result yourself or
+are debugging a specific failure.
+
+**Authentication and project**
+
+```sh
+gcloud auth list                       # an ACTIVE account must be listed
+gcloud projects describe $GCP_PROJECT  # must resolve
+gcloud services list --enabled --project $GCP_PROJECT | grep compute.googleapis.com
+```
+
+**Permissions** — answers "may I create a VM?" without creating one:
+
+```sh
+curl -s -X POST \
+  -H "Authorization: Bearer $(gcloud auth print-access-token)" \
+  -H "Content-Type: application/json" \
+  -d '{"permissions":["compute.instances.create","compute.instances.delete","compute.disks.create"]}' \
+  "https://cloudresourcemanager.googleapis.com/v1/projects/$GCP_PROJECT:testIamPermissions"
+```
+
+Every permission you asked about must come back in the response. Anything
+missing is not granted; ask a project admin for `roles/compute.instanceAdmin.v1`.
+
+**Quota** — see [Checking quota before you provision](#checking-quota-before-you-provision) below.
+
+**Machine type and image**
+
+```sh
+gcloud compute machine-types describe a3-highgpu-1g --zone=$GCP_ZONE
+gcloud compute images describe-from-family ubuntu-2204-lts \
+  --project=ubuntu-os-cloud --format="value(name,guestOsFeatures)"
+```
+
+The image's `guestOsFeatures` must include `TDX_CAPABLE`, or the confidential
+arm cannot boot from it.
+
+**Hugging Face access** — a token that authenticates fine but whose owner has
+not accepted Meta's licence returns **403** on the model download, and the
+natural place to discover that is twenty minutes into setting up a running
+$10/hour GPU:
+
+```sh
+curl -s -o /dev/null -w '%{http_code}\n' \
+  -H "Authorization: Bearer $HUGGINGFACE_TOKEN" \
+  https://huggingface.co/api/models/meta-llama/Llama-2-7b-hf
+```
+
+`200` is what you want. `401` means the token is bad; `403` means the token is
+valid but the licence has not been accepted — see
+[Hugging Face access token](README.md#hugging-face-access-token).
 
 ## Checking quota before you provision
 
@@ -127,16 +184,26 @@ paid project, so don't assume it exists. Because `a3-highgpu-1g` is Spot-only,
 the metric that actually gates this experiment is
 `PREEMPTIBLE_NVIDIA_H100_GPUS`, **not** `NVIDIA_H100_GPUS`:
 
+> [!IMPORTANT]
+> Do **not** check this with `gcloud compute regions describe`. That command
+> lists the legacy quota metrics only, and H100 is not among them — it returns
+> nothing at all for `PREEMPTIBLE_NVIDIA_H100_GPUS`, which is indistinguishable
+> from a limit of 0 if you are not expecting it. Newer GPU metrics live in the
+> Cloud Quotas API, where an unset quota comes back as `null`.
+
 ```sh
-for REGION in us-central1 us-east5 europe-west4; do
-  echo "== $REGION"
-  gcloud compute regions describe $REGION --format=json \
-    | jq -r '.quotas[] | select(.metric=="PREEMPTIBLE_NVIDIA_H100_GPUS")'
-done
+curl -s -H "Authorization: Bearer $(gcloud auth print-access-token)" \
+  "https://cloudquotas.googleapis.com/v1/projects/$GCP_PROJECT/locations/global/services/compute.googleapis.com/quotaInfos/PREEMPTIBLE-NVIDIA-H100-GPUS-per-project-region" \
+  | jq -r '.dimensionsInfos[] | "\(.applicableLocations) -> \(.details.value)"'
 ```
 
+Regions you have never been granted quota in are grouped into one entry with
+`value: null`; a granted region appears on its own with its limit. You need at
+least 1 in one of `us-central1`, `us-east5` or `europe-west4`.
+
 There is also a global cap on GPUs of all types across all regions, which is
-easy to overlook because it is on the project, not the region:
+easy to overlook because it is on the project, not the region. This one *is*
+still in the legacy view:
 
 ```sh
 gcloud compute project-info describe --format=json \
