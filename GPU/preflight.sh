@@ -126,16 +126,27 @@ head_ "3. H100 quota (Confidential VM with GPU is Spot-only)"
 # so PREEMPTIBLE_NVIDIA_H100_GPUS -- not NVIDIA_H100_GPUS -- is the quota that
 # actually gates this experiment.
 if [ -n "$GCP_PROJECT" ] && [ -n "$ACCOUNT" ]; then
-    printf '  %-18s %10s %10s %10s\n' REGION METRIC LIMIT USAGE
+    # H100 quotas are not exposed by `gcloud compute regions describe` -- newer
+    # GPU metrics live only in the Cloud Quotas API, where an unset quota comes
+    # back as null rather than 0. Reading the legacy view reports FAIL even
+    # after a grant, so query Cloud Quotas directly.
+    QUOTA_ID="PREEMPTIBLE-NVIDIA-H100-GPUS-per-project-region"
+    QUOTA_JSON="$(curl -s \
+        -H "Authorization: Bearer $(gcloud auth print-access-token 2>/dev/null)" \
+        "https://cloudquotas.googleapis.com/v1/projects/$GCP_PROJECT/locations/global/services/compute.googleapis.com/quotaInfos/$QUOTA_ID" \
+        2>/dev/null)"
+
+    printf '  %-18s %30s %8s\n' REGION METRIC LIMIT
     for zone in "${SUPPORTED_ZONES[@]}"; do
         region="${zone%-*}"
-        limit="$(gcloud compute regions describe "$region" --project "$GCP_PROJECT" --format=json 2>/dev/null \
-            | jq -r '.quotas[] | select(.metric=="PREEMPTIBLE_NVIDIA_H100_GPUS") | .limit' 2>/dev/null)"
-        usage="$(gcloud compute regions describe "$region" --project "$GCP_PROJECT" --format=json 2>/dev/null \
-            | jq -r '.quotas[] | select(.metric=="PREEMPTIBLE_NVIDIA_H100_GPUS") | .usage' 2>/dev/null)"
-        limit="${limit:-0}"; usage="${usage:-0}"
-        printf '  %-18s %10s %10s %10s\n' "$region" H100_SPOT "$limit" "$usage"
-        if [ -z "$USABLE_ZONE" ] && awk "BEGIN{exit !($limit - $usage >= 1)}"; then
+        limit="$(echo "$QUOTA_JSON" | jq -r --arg r "$region" '
+            [.dimensionsInfos[]?
+             | select((.applicableLocations // []) | index($r))
+             | .details.value] | first // 0' 2>/dev/null)"
+        [ "$limit" = "null" ] && limit=0
+        limit="${limit:-0}"
+        printf '  %-18s %30s %8s\n' "$region" PREEMPTIBLE_NVIDIA_H100_GPUS "$limit"
+        if [ -z "$USABLE_ZONE" ] && awk "BEGIN{exit !($limit >= 1)}"; then
             USABLE_ZONE="$zone"
         fi
     done
