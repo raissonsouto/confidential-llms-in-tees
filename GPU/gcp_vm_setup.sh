@@ -162,7 +162,36 @@ if ! done_with vllm; then
 fi
 
 ########################################################################
-# 5. Hardware snapshot
+# 5. Verify CUDA can actually initialise
+########################################################################
+# nvidia-smi working is NOT evidence that CUDA can initialise. On the first boot
+# after the driver is installed the GPU can come up half-initialised: nvidia-smi
+# reports the card fine, but cuInit fails with error 802
+# (CUDA_ERROR_SYSTEM_NOT_READY) and every benchmark configuration dies at engine
+# startup. A second reboot clears it. Checked here rather than discovered six
+# failed configurations into a sweep on a billing GPU.
+
+# shellcheck disable=SC1091
+source "$HOME/.venv/bin/activate"
+if ! done_with cudacheck; then
+    if python3 -c 'import torch,sys; sys.exit(0 if torch.cuda.is_available() else 1)' 2>/dev/null; then
+        mark_done cudacheck
+        echo "CUDA initialises correctly."
+    else
+        mark_done cudacheck
+        echo ""
+        echo "=========================================================================="
+        echo "CUDA cannot initialise yet even though nvidia-smi works (error 802)."
+        echo "This clears with one more reboot. Rebooting now -- reconnect and run:"
+        echo "    ./gcp_vm_setup.sh $SYSTEM"
+        echo "=========================================================================="
+        sudo reboot
+        exit 0
+    fi
+fi
+
+########################################################################
+# 6. Hardware snapshot
 ########################################################################
 # Mirrors what CPU/run.sh captures (lscpu / lshw / numactl) so a GPU result
 # folder documents its own machine the same way the CPU ones do.
@@ -178,8 +207,6 @@ free -h                              > "$SNAP/free.out"        2>&1 || true
 if [ "$SYSTEM" = "cgpu" ]; then
     sudo nvidia-smi conf-compute -f  > "$SNAP/conf-compute.out" 2>&1 || true
 fi
-# shellcheck disable=SC1091
-source "$HOME/.venv/bin/activate"
 python3 -c "import vllm, torch; print('vllm', vllm.__version__); print('torch', torch.__version__)" \
                                      > "$SNAP/versions.out"    2>&1 || true
 
