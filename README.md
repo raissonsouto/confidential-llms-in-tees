@@ -31,7 +31,6 @@ Repository to include scripts to run inference benchmarks in CC environments.
     - [Running the GPU sweep](#running-the-gpu-sweep)
     - [Collecting results](#collecting-results)
     - [Processing GPU results](#processing-gpu-results)
-    - [GPU caveats](#gpu-caveats)
 
 ## Prerequisites
 
@@ -327,9 +326,8 @@ cat results_cgpu_*/latency_in128_bs1.log.kv
 ```
 
 The heaviest cell, batch 64 at input 2048, is deliberately *not* the smoke
-test: whether it fits in 80 GB is one of the things the sweep is measuring
-(see [GPU caveats](#gpu-caveats)), so it belongs in the run rather than in the
-gate that precedes it.
+test: whether it fits in 80 GB is one of the things the sweep is measuring, so
+it belongs in the run rather than in the gate that precedes it.
 
 ### Running the GPU sweep
 
@@ -381,27 +379,3 @@ specific run with `GPU_COST_PER_HOUR=<usd> python3 parse.py ...`. `plot_GPUs.py`
 writes `results/gpu_throughput_comparison.png`: throughput vs batch size at a
 fixed input length, and vs input length at a fixed batch size, with each
 confidential bar annotated with its overhead against the baseline.
-
-### GPU caveats
-
-- **Batch 64 at input 2048 is expected to be tight, and its outcome is a
-  result.** Llama-2-7B uses multi-head attention, so its KV cache costs about
-  0.5 MB per token: batch 64 × (2048 + 128) tokens needs roughly 68 GB, on top
-  of about 13.5 GB of weights, against an 80 GB H100. That cell may OOM, or may
-  run with the batch split across scheduler waves. Either outcome is a finding
-  about the memory ceiling of confidential inference at this shape, and is
-  reported as such — the CPU track records its OOM cells the same way (see
-  [AZURE.md](AZURE.md#virtual-machines-used)). The sweep runs at
-  `--gpu-memory-utilization 0.95 --max-model-len 2176` and records vLLM's own
-  `GPU KV cache size` and `Maximum concurrency` lines per configuration in
-  `<log>.kv`, so what actually happened is evidenced rather than inferred.
-  Override with `GPU_MEM_UTIL` and `MAX_MODEL_LEN` to measure a different
-  point.
-- **Both arms are Spot instances.** This is forced by the platform, not chosen.
-  It makes the two arms symmetric, but it also means neither arm has a
-  guaranteed-uninterrupted host, and run-to-run variance may be higher than on
-  dedicated hardware.
-- **Ubuntu 22.04, not 24.04.** The GPU arms run 22.04 because that is the only
-  Ubuntu image Google supports for Confidential VM with GPU; the CPU arms run
-  24.04. Compare TEE-vs-baseline ratios within a track rather than absolute
-  numbers across tracks.
