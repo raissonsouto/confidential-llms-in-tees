@@ -5,7 +5,21 @@ set -euxo pipefail
 
 config=$1
 
-config_num_iter=50
+# Disable AMX on every setup so results are comparable across CPU generations
+# regardless of whether the host exposes AMX. Three knobs, one per kernel
+# backend: ATen dispatch (valid values are avx2/avx512 only, avx512_bf16 is
+# silently ignored), the oneDNN JIT, and libxsmm (used by the IPEX TPP
+# kernels, which honor neither of the first two; cpx = Cooper Lake,
+# AVX512-BF16 without AMX). LIBXSMM_TARGET is a hard target, not a ceiling:
+# on hosts without the cpx ISA (e.g. Ice Lake, no AVX512-BF16 instructions)
+# it makes libxsmm emit illegal instructions (SIGILL), so only set it where
+# there is AMX to suppress.
+config_no_amx='export ATEN_CPU_CAPABILITY=avx512 ONEDNN_MAX_CPU_ISA=AVX512_CORE_BF16'
+if grep -qw amx_tile /proc/cpuinfo; then
+    config_no_amx="$config_no_amx LIBXSMM_TARGET=cpx"
+fi
+
+config_num_iter=30
 config_num_warmup=10
 config_out_token=128
 config_in_token=1024
@@ -26,26 +40,26 @@ echo "$1 stored in $directory" >> experiment.log
     numactl --hardware &> $directory/numactl-hw.out
 
     # initialize variables with different values
-    for vCPUs in '1' '1-2' '1-4' '1-8' '1-16' '1-32' '1-48' '0-59'; do # if you want to use all cores available to the system just leave empty ''; if you want to use cores accross sockets, you can use `--num_accelerators 2` in the main command
-        for batch_size in 1 2 4 8 16 32 64 128; do
-            for in_token in 32 64 128 256 512 1024 2048; do
+    for vCPUs in '0-15'; do # all 16 vCPUs of the Azure VMs; leave empty '' to use every core available to the system
+        for batch_size in 1 64; do
+            for in_token in 128 512 2048; do
                 for out_token in 128; do
-                    for quant in '' '--ipex-weight-only-quantization --weight-dtype INT8 --quant-with-amp'; do # needs first quantizing
-                        for model in 'meta-llama/Llama-2-7b-hf' 'meta-llama/Llama-2-13b-hf' 'meta-llama/Llama-2-70b-hf'; do # 
-                            # other working options 'EleutherAI/gpt-j-6b' 'tiiuae/falcon-7b' 'baichuan-inc/Baichuan2-7B-Chat' 'Qwen/Qwen-7B-Chat' 'meta-llama/Meta-Llama-3-8B'
-                            # for these you need to modify the name outputting
-                            # not working 'mosaicml/mpt-7b' (error) 'liuhaotian/llava-v1.5-7b' (no class) 'mistralai/Mistral-7B-v0.1' (error)                    
+                    for quant in ''; do # bfloat16 only; INT8 quantization removed
+                        for model in 'meta-llama/Llama-2-7b-hf'; do
                             num_iter=$config_num_iter
                             num_warmup=$config_num_warmup
                             # cmp output name
                             name=$directory/$1
                             name=$name-${in_token}in
                             name=$name-${out_token}out
+                            # do not overwrite the loop variable: the outer
+                            # vCPUs loop reuses it on the next inner iteration
                             if [[ -n ${vCPUs//[[:space:]]/} ]]; then
                                 vCPUs_num=$(awk -F- '{print (NF==1)?$1:($2-$1+1)}' <<< "$vCPUs")
-                                vCPUs="--bind_core_list $vCPUs"
+                                bind_arg="--bind_core_list $vCPUs"
                             else
                                 vCPUs_num=$config_procs
+                                bind_arg=''
                             fi
                             name=$name-${vCPUs_num}vCPU
                             if (( vCPUs_num > config_socket )); then
@@ -55,49 +69,34 @@ echo "$1 stored in $directory" >> experiment.log
                             fi
                             name=$name-$numa
                             name=$name-${batch_size}bs
-                            if [[ $model == *"7b"* ]]; then
-                                name=$name-7b
-                            elif [[ $model == *"13b"* ]]; then
-                                name=$name-13b
-                            elif [[ $model == *"70b"* ]]; then
-                                name=$name-70b
-                                num_iter=$(( $num_iter/2 ))
-                                num_warmup=$(( $num_warmup/2 ))
-                            fi
-                            if [ ! -z "${quant}" ]; then
-                                name=$name-int8
-                            else
-                                name=$name-bf16
-                            fi
+                            name=$name-7b
+                            name=$name-bf16
                             # set greedy if single batch
                             greedy=''
                             if [[ "$batch_size" -eq 1 ]]; then
                                 greedy='--greedy'
                             else
-                                num_iter=$(( $num_iter/2 ))
                                 num_warmup=$(( $num_warmup/2 ))
                             fi
 
                             # safety
-                            if [[ "$num_iter" -le 1 ]]; then
-                                num_iter=5
-                            fi
                             if [[ "$num_warmup" -le 1 ]]; then
                                 num_warmup=2
                             fi
 
                             cmd=(docker run --rm --privileged --shm-size="2gb" -v $HOME/.cache:/home/ubuntu/.cache ipex-llm:2.3.100 bash -c \
-                                "cd llm && source ../miniforge3/bin/activate && conda activate py310 && source tools/env_activate.sh && sudo chown -R 1000:1000 ~/.cache && deepspeed --bind_cores_to_rank $vCPUs distributed/run_generation_with_deepspeed.py --deployment-mode --profile --benchmark -m $model $quant --ipex --batch-size $batch_size --num-iter $num_iter --num-warmup $num_warmup --max-new-tokens $out_token --input-tokens $in_token --token-latency $greedy" )
+                                "$config_no_amx && cd llm && source ../miniforge3/bin/activate && conda activate py310 && source tools/env_activate.sh && sudo chown -R 1000:1000 ~/.cache && deepspeed --bind_cores_to_rank $bind_arg distributed/run_generation_with_deepspeed.py --deployment-mode --profile --benchmark -m $model $quant --ipex --dtype bfloat16 --batch-size $batch_size --num-iter $num_iter --num-warmup $num_warmup --max-new-tokens $out_token --input-tokens $in_token --token-latency $greedy" )
 
                             # log cmd
                             echo "${cmd[@]}" > $name.txt
 
-                            # run cmd
-                            "${cmd[@]}" &>> $name.txt
+                            # run cmd; do not let one failed config (e.g. an
+                            # OOM-killed docker run, exit 247) abort the whole
+                            # sweep under `set -e`
+                            "${cmd[@]}" &>> $name.txt || echo "FAILED $name (exit $?)"
 
                             # Finished run
-                            echo "Finished"
-                            exit 0
+                            echo "Finished $name"
                         done
                     done
                 done

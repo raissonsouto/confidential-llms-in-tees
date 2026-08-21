@@ -1,0 +1,149 @@
++ lscpu
++ lshw
++ numactl --hardware
++ for vCPUs in '0-15'
++ for batch_size in 1 64
++ for in_token in 128 512 2048
++ for out_token in 128
++ for quant in ''
++ for model in 'meta-llama/Llama-2-7b-hf'
++ num_iter=30
++ num_warmup=10
++ name=results/2026-07-07-04-06/tdx
++ name=results/2026-07-07-04-06/tdx-128in
++ name=results/2026-07-07-04-06/tdx-128in-128out
++ [[ -n 0-15 ]]
+++ awk -F- '{print (NF==1)?$1:($2-$1+1)}'
++ vCPUs_num=16
++ bind_arg='--bind_core_list 0-15'
++ name=results/2026-07-07-04-06/tdx-128in-128out-16vCPU
++ ((  vCPUs_num > config_socket  ))
++ numa=1s
++ name=results/2026-07-07-04-06/tdx-128in-128out-16vCPU-1s
++ name=results/2026-07-07-04-06/tdx-128in-128out-16vCPU-1s-1bs
++ name=results/2026-07-07-04-06/tdx-128in-128out-16vCPU-1s-1bs-7b
++ name=results/2026-07-07-04-06/tdx-128in-128out-16vCPU-1s-1bs-7b-bf16
++ greedy=
++ [[ 1 -eq 1 ]]
++ greedy=--greedy
++ [[ 10 -le 1 ]]
++ cmd=(docker run --rm --privileged --shm-size="2gb" -v $HOME/.cache:/home/ubuntu/.cache ipex-llm:2.3.100 bash -c "$config_no_amx && cd llm && source ../miniforge3/bin/activate && conda activate py310 && source tools/env_activate.sh && sudo chown -R 1000:1000 ~/.cache && deepspeed --bind_cores_to_rank $bind_arg distributed/run_generation_with_deepspeed.py --deployment-mode --profile --benchmark -m $model $quant --ipex --dtype bfloat16 --batch-size $batch_size --num-iter $num_iter --num-warmup $num_warmup --max-new-tokens $out_token --input-tokens $in_token --token-latency $greedy")
++ echo docker run --rm --privileged --shm-size=2gb -v /home/azureuser/.cache:/home/ubuntu/.cache ipex-llm:2.3.100 bash -c 'export ATEN_CPU_CAPABILITY=avx512 ONEDNN_MAX_CPU_ISA=AVX512_CORE_BF16 LIBXSMM_TARGET=cpx && cd llm && source ../miniforge3/bin/activate && conda activate py310 && source tools/env_activate.sh && sudo chown -R 1000:1000 ~/.cache && deepspeed --bind_cores_to_rank --bind_core_list 0-15 distributed/run_generation_with_deepspeed.py --deployment-mode --profile --benchmark -m meta-llama/Llama-2-7b-hf  --ipex --dtype bfloat16 --batch-size 1 --num-iter 30 --num-warmup 10 --max-new-tokens 128 --input-tokens 128 --token-latency --greedy'
++ docker run --rm --privileged --shm-size=2gb -v /home/azureuser/.cache:/home/ubuntu/.cache ipex-llm:2.3.100 bash -c 'export ATEN_CPU_CAPABILITY=avx512 ONEDNN_MAX_CPU_ISA=AVX512_CORE_BF16 LIBXSMM_TARGET=cpx && cd llm && source ../miniforge3/bin/activate && conda activate py310 && source tools/env_activate.sh && sudo chown -R 1000:1000 ~/.cache && deepspeed --bind_cores_to_rank --bind_core_list 0-15 distributed/run_generation_with_deepspeed.py --deployment-mode --profile --benchmark -m meta-llama/Llama-2-7b-hf  --ipex --dtype bfloat16 --batch-size 1 --num-iter 30 --num-warmup 10 --max-new-tokens 128 --input-tokens 128 --token-latency --greedy'
++ echo 'Finished results/2026-07-07-04-06/tdx-128in-128out-16vCPU-1s-1bs-7b-bf16'
+Finished results/2026-07-07-04-06/tdx-128in-128out-16vCPU-1s-1bs-7b-bf16
++ for in_token in 128 512 2048
++ for out_token in 128
++ for quant in ''
++ for model in 'meta-llama/Llama-2-7b-hf'
++ num_iter=30
++ num_warmup=10
++ name=results/2026-07-07-04-06/tdx
++ name=results/2026-07-07-04-06/tdx-512in
++ name=results/2026-07-07-04-06/tdx-512in-128out
++ [[ -n 0-15 ]]
+++ awk -F- '{print (NF==1)?$1:($2-$1+1)}'
++ vCPUs_num=16
++ bind_arg='--bind_core_list 0-15'
++ name=results/2026-07-07-04-06/tdx-512in-128out-16vCPU
++ ((  vCPUs_num > config_socket  ))
++ numa=1s
++ name=results/2026-07-07-04-06/tdx-512in-128out-16vCPU-1s
++ name=results/2026-07-07-04-06/tdx-512in-128out-16vCPU-1s-1bs
++ name=results/2026-07-07-04-06/tdx-512in-128out-16vCPU-1s-1bs-7b
++ name=results/2026-07-07-04-06/tdx-512in-128out-16vCPU-1s-1bs-7b-bf16
++ greedy=
++ [[ 1 -eq 1 ]]
++ greedy=--greedy
++ [[ 10 -le 1 ]]
++ cmd=(docker run --rm --privileged --shm-size="2gb" -v $HOME/.cache:/home/ubuntu/.cache ipex-llm:2.3.100 bash -c "$config_no_amx && cd llm && source ../miniforge3/bin/activate && conda activate py310 && source tools/env_activate.sh && sudo chown -R 1000:1000 ~/.cache && deepspeed --bind_cores_to_rank $bind_arg distributed/run_generation_with_deepspeed.py --deployment-mode --profile --benchmark -m $model $quant --ipex --dtype bfloat16 --batch-size $batch_size --num-iter $num_iter --num-warmup $num_warmup --max-new-tokens $out_token --input-tokens $in_token --token-latency $greedy")
++ echo docker run --rm --privileged --shm-size=2gb -v /home/azureuser/.cache:/home/ubuntu/.cache ipex-llm:2.3.100 bash -c 'export ATEN_CPU_CAPABILITY=avx512 ONEDNN_MAX_CPU_ISA=AVX512_CORE_BF16 LIBXSMM_TARGET=cpx && cd llm && source ../miniforge3/bin/activate && conda activate py310 && source tools/env_activate.sh && sudo chown -R 1000:1000 ~/.cache && deepspeed --bind_cores_to_rank --bind_core_list 0-15 distributed/run_generation_with_deepspeed.py --deployment-mode --profile --benchmark -m meta-llama/Llama-2-7b-hf  --ipex --dtype bfloat16 --batch-size 1 --num-iter 30 --num-warmup 10 --max-new-tokens 128 --input-tokens 512 --token-latency --greedy'
++ docker run --rm --privileged --shm-size=2gb -v /home/azureuser/.cache:/home/ubuntu/.cache ipex-llm:2.3.100 bash -c 'export ATEN_CPU_CAPABILITY=avx512 ONEDNN_MAX_CPU_ISA=AVX512_CORE_BF16 LIBXSMM_TARGET=cpx && cd llm && source ../miniforge3/bin/activate && conda activate py310 && source tools/env_activate.sh && sudo chown -R 1000:1000 ~/.cache && deepspeed --bind_cores_to_rank --bind_core_list 0-15 distributed/run_generation_with_deepspeed.py --deployment-mode --profile --benchmark -m meta-llama/Llama-2-7b-hf  --ipex --dtype bfloat16 --batch-size 1 --num-iter 30 --num-warmup 10 --max-new-tokens 128 --input-tokens 512 --token-latency --greedy'
++ echo 'Finished results/2026-07-07-04-06/tdx-512in-128out-16vCPU-1s-1bs-7b-bf16'
+Finished results/2026-07-07-04-06/tdx-512in-128out-16vCPU-1s-1bs-7b-bf16
++ for in_token in 128 512 2048
++ for out_token in 128
++ for quant in ''
++ for model in 'meta-llama/Llama-2-7b-hf'
++ num_iter=30
++ num_warmup=10
++ name=results/2026-07-07-04-06/tdx
++ name=results/2026-07-07-04-06/tdx-2048in
++ name=results/2026-07-07-04-06/tdx-2048in-128out
++ [[ -n 0-15 ]]
+++ awk -F- '{print (NF==1)?$1:($2-$1+1)}'
++ vCPUs_num=16
++ bind_arg='--bind_core_list 0-15'
++ name=results/2026-07-07-04-06/tdx-2048in-128out-16vCPU
++ ((  vCPUs_num > config_socket  ))
++ numa=1s
++ name=results/2026-07-07-04-06/tdx-2048in-128out-16vCPU-1s
++ name=results/2026-07-07-04-06/tdx-2048in-128out-16vCPU-1s-1bs
++ name=results/2026-07-07-04-06/tdx-2048in-128out-16vCPU-1s-1bs-7b
++ name=results/2026-07-07-04-06/tdx-2048in-128out-16vCPU-1s-1bs-7b-bf16
++ greedy=
++ [[ 1 -eq 1 ]]
++ greedy=--greedy
++ [[ 10 -le 1 ]]
++ cmd=(docker run --rm --privileged --shm-size="2gb" -v $HOME/.cache:/home/ubuntu/.cache ipex-llm:2.3.100 bash -c "$config_no_amx && cd llm && source ../miniforge3/bin/activate && conda activate py310 && source tools/env_activate.sh && sudo chown -R 1000:1000 ~/.cache && deepspeed --bind_cores_to_rank $bind_arg distributed/run_generation_with_deepspeed.py --deployment-mode --profile --benchmark -m $model $quant --ipex --dtype bfloat16 --batch-size $batch_size --num-iter $num_iter --num-warmup $num_warmup --max-new-tokens $out_token --input-tokens $in_token --token-latency $greedy")
++ echo docker run --rm --privileged --shm-size=2gb -v /home/azureuser/.cache:/home/ubuntu/.cache ipex-llm:2.3.100 bash -c 'export ATEN_CPU_CAPABILITY=avx512 ONEDNN_MAX_CPU_ISA=AVX512_CORE_BF16 LIBXSMM_TARGET=cpx && cd llm && source ../miniforge3/bin/activate && conda activate py310 && source tools/env_activate.sh && sudo chown -R 1000:1000 ~/.cache && deepspeed --bind_cores_to_rank --bind_core_list 0-15 distributed/run_generation_with_deepspeed.py --deployment-mode --profile --benchmark -m meta-llama/Llama-2-7b-hf  --ipex --dtype bfloat16 --batch-size 1 --num-iter 30 --num-warmup 10 --max-new-tokens 128 --input-tokens 2048 --token-latency --greedy'
++ docker run --rm --privileged --shm-size=2gb -v /home/azureuser/.cache:/home/ubuntu/.cache ipex-llm:2.3.100 bash -c 'export ATEN_CPU_CAPABILITY=avx512 ONEDNN_MAX_CPU_ISA=AVX512_CORE_BF16 LIBXSMM_TARGET=cpx && cd llm && source ../miniforge3/bin/activate && conda activate py310 && source tools/env_activate.sh && sudo chown -R 1000:1000 ~/.cache && deepspeed --bind_cores_to_rank --bind_core_list 0-15 distributed/run_generation_with_deepspeed.py --deployment-mode --profile --benchmark -m meta-llama/Llama-2-7b-hf  --ipex --dtype bfloat16 --batch-size 1 --num-iter 30 --num-warmup 10 --max-new-tokens 128 --input-tokens 2048 --token-latency --greedy'
++ echo 'Finished results/2026-07-07-04-06/tdx-2048in-128out-16vCPU-1s-1bs-7b-bf16'
+Finished results/2026-07-07-04-06/tdx-2048in-128out-16vCPU-1s-1bs-7b-bf16
++ for batch_size in 1 64
++ for in_token in 128 512 2048
++ for out_token in 128
++ for quant in ''
++ for model in 'meta-llama/Llama-2-7b-hf'
++ num_iter=30
++ num_warmup=10
++ name=results/2026-07-07-04-06/tdx
++ name=results/2026-07-07-04-06/tdx-128in
++ name=results/2026-07-07-04-06/tdx-128in-128out
++ [[ -n 0-15 ]]
+++ awk -F- '{print (NF==1)?$1:($2-$1+1)}'
++ vCPUs_num=16
++ bind_arg='--bind_core_list 0-15'
++ name=results/2026-07-07-04-06/tdx-128in-128out-16vCPU
++ ((  vCPUs_num > config_socket  ))
++ numa=1s
++ name=results/2026-07-07-04-06/tdx-128in-128out-16vCPU-1s
++ name=results/2026-07-07-04-06/tdx-128in-128out-16vCPU-1s-64bs
++ name=results/2026-07-07-04-06/tdx-128in-128out-16vCPU-1s-64bs-7b
++ name=results/2026-07-07-04-06/tdx-128in-128out-16vCPU-1s-64bs-7b-bf16
++ greedy=
++ [[ 64 -eq 1 ]]
++ num_warmup=5
++ [[ 5 -le 1 ]]
++ cmd=(docker run --rm --privileged --shm-size="2gb" -v $HOME/.cache:/home/ubuntu/.cache ipex-llm:2.3.100 bash -c "$config_no_amx && cd llm && source ../miniforge3/bin/activate && conda activate py310 && source tools/env_activate.sh && sudo chown -R 1000:1000 ~/.cache && deepspeed --bind_cores_to_rank $bind_arg distributed/run_generation_with_deepspeed.py --deployment-mode --profile --benchmark -m $model $quant --ipex --dtype bfloat16 --batch-size $batch_size --num-iter $num_iter --num-warmup $num_warmup --max-new-tokens $out_token --input-tokens $in_token --token-latency $greedy")
++ echo docker run --rm --privileged --shm-size=2gb -v /home/azureuser/.cache:/home/ubuntu/.cache ipex-llm:2.3.100 bash -c 'export ATEN_CPU_CAPABILITY=avx512 ONEDNN_MAX_CPU_ISA=AVX512_CORE_BF16 LIBXSMM_TARGET=cpx && cd llm && source ../miniforge3/bin/activate && conda activate py310 && source tools/env_activate.sh && sudo chown -R 1000:1000 ~/.cache && deepspeed --bind_cores_to_rank --bind_core_list 0-15 distributed/run_generation_with_deepspeed.py --deployment-mode --profile --benchmark -m meta-llama/Llama-2-7b-hf  --ipex --dtype bfloat16 --batch-size 64 --num-iter 30 --num-warmup 5 --max-new-tokens 128 --input-tokens 128 --token-latency '
++ docker run --rm --privileged --shm-size=2gb -v /home/azureuser/.cache:/home/ubuntu/.cache ipex-llm:2.3.100 bash -c 'export ATEN_CPU_CAPABILITY=avx512 ONEDNN_MAX_CPU_ISA=AVX512_CORE_BF16 LIBXSMM_TARGET=cpx && cd llm && source ../miniforge3/bin/activate && conda activate py310 && source tools/env_activate.sh && sudo chown -R 1000:1000 ~/.cache && deepspeed --bind_cores_to_rank --bind_core_list 0-15 distributed/run_generation_with_deepspeed.py --deployment-mode --profile --benchmark -m meta-llama/Llama-2-7b-hf  --ipex --dtype bfloat16 --batch-size 64 --num-iter 30 --num-warmup 5 --max-new-tokens 128 --input-tokens 128 --token-latency '
++ echo 'Finished results/2026-07-07-04-06/tdx-128in-128out-16vCPU-1s-64bs-7b-bf16'
+Finished results/2026-07-07-04-06/tdx-128in-128out-16vCPU-1s-64bs-7b-bf16
++ for in_token in 128 512 2048
++ for out_token in 128
++ for quant in ''
++ for model in 'meta-llama/Llama-2-7b-hf'
++ num_iter=30
++ num_warmup=10
++ name=results/2026-07-07-04-06/tdx
++ name=results/2026-07-07-04-06/tdx-512in
++ name=results/2026-07-07-04-06/tdx-512in-128out
++ [[ -n 0-15 ]]
+++ awk -F- '{print (NF==1)?$1:($2-$1+1)}'
++ vCPUs_num=16
++ bind_arg='--bind_core_list 0-15'
++ name=results/2026-07-07-04-06/tdx-512in-128out-16vCPU
++ ((  vCPUs_num > config_socket  ))
++ numa=1s
++ name=results/2026-07-07-04-06/tdx-512in-128out-16vCPU-1s
++ name=results/2026-07-07-04-06/tdx-512in-128out-16vCPU-1s-64bs
++ name=results/2026-07-07-04-06/tdx-512in-128out-16vCPU-1s-64bs-7b
++ name=results/2026-07-07-04-06/tdx-512in-128out-16vCPU-1s-64bs-7b-bf16
++ greedy=
++ [[ 64 -eq 1 ]]
++ num_warmup=5
++ [[ 5 -le 1 ]]
++ cmd=(docker run --rm --privileged --shm-size="2gb" -v $HOME/.cache:/home/ubuntu/.cache ipex-llm:2.3.100 bash -c "$config_no_amx && cd llm && source ../miniforge3/bin/activate && conda activate py310 && source tools/env_activate.sh && sudo chown -R 1000:1000 ~/.cache && deepspeed --bind_cores_to_rank $bind_arg distributed/run_generation_with_deepspeed.py --deployment-mode --profile --benchmark -m $model $quant --ipex --dtype bfloat16 --batch-size $batch_size --num-iter $num_iter --num-warmup $num_warmup --max-new-tokens $out_token --input-tokens $in_token --token-latency $greedy")
++ echo docker run --rm --privileged --shm-size=2gb -v /home/azureuser/.cache:/home/ubuntu/.cache ipex-llm:2.3.100 bash -c 'export ATEN_CPU_CAPABILITY=avx512 ONEDNN_MAX_CPU_ISA=AVX512_CORE_BF16 LIBXSMM_TARGET=cpx && cd llm && source ../miniforge3/bin/activate && conda activate py310 && source tools/env_activate.sh && sudo chown -R 1000:1000 ~/.cache && deepspeed --bind_cores_to_rank --bind_core_list 0-15 distributed/run_generation_with_deepspeed.py --deployment-mode --profile --benchmark -m meta-llama/Llama-2-7b-hf  --ipex --dtype bfloat16 --batch-size 64 --num-iter 30 --num-warmup 5 --max-new-tokens 128 --input-tokens 512 --token-latency '
++ docker run --rm --privileged --shm-size=2gb -v /home/azureuser/.cache:/home/ubuntu/.cache ipex-llm:2.3.100 bash -c 'export ATEN_CPU_CAPABILITY=avx512 ONEDNN_MAX_CPU_ISA=AVX512_CORE_BF16 LIBXSMM_TARGET=cpx && cd llm && source ../miniforge3/bin/activate && conda activate py310 && source tools/env_activate.sh && sudo chown -R 1000:1000 ~/.cache && deepspeed --bind_cores_to_rank --bind_core_list 0-15 distributed/run_generation_with_deepspeed.py --deployment-mode --profile --benchmark -m meta-llama/Llama-2-7b-hf  --ipex --dtype bfloat16 --batch-size 64 --num-iter 30 --num-warmup 5 --max-new-tokens 128 --input-tokens 512 --token-latency '

@@ -10,6 +10,3 @@
 	path = CPU/gramine
 	url = https://github.com/gramineproject/gramine.git
 	branch = v1.7
-[submodule "RAG/beir"]
-	path = RAG/beir
-	url = https://github.com/beir-cellar/beir

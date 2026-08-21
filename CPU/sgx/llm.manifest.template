@@ -17,6 +17,13 @@ loader.log_level = "{{ log_level }}"
 loader.env.LD_LIBRARY_PATH = "/lib:{{ arch_libdir }}:/usr/{{ arch_libdir }}"
 loader.env.HOME = "{{ env.HOME }}"
 loader.env.MALLOC_ARENA_MAX = "1"
+# Disable AMX on every setup: cap ATen dispatch and the oneDNN JIT below AMX
+# (matches CPU/run.sh for the non-SGX systems). No LIBXSMM_TARGET here: it is
+# a hard target that SIGILLs on hosts without the target ISA, and libxsmm's
+# own detection cannot see AMX anyway because sgx.cpu_features.amx below
+# masks it from CPUID inside the enclave.
+loader.env.ATEN_CPU_CAPABILITY = "avx512"
+loader.env.ONEDNN_MAX_CPU_ISA = "AVX512_CORE_BF16"
 
 loader.insecure__use_cmdline_argv = true
 loader.insecure__use_host_env = true
@@ -67,7 +74,9 @@ sgx.allowed_files = [
 
 sgx.cpu_features.avx    = "required"
 sgx.cpu_features.avx512 = "required"
-sgx.cpu_features.amx    = "required"
+# AMX is disabled repo-wide (see CPU/run.sh); masking it in CPUID also lets the
+# enclave run on hardware without AMX (e.g. Ice Lake DCsv3 on Azure).
+sgx.cpu_features.amx    = "disabled"
 
 # Gramine optionally provides patched OpenMP runtime library that runs faster inside SGX enclaves
 # (add `-Dlibgomp=enabled` when configuring the build). Uncomment the line below to use the patched

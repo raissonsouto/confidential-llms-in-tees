@@ -1,0 +1,158 @@
+Gramine is starting. Parsing TOML manifest file, this may take some time...
+-----------------------------------------------------------------------------------------------------------------------
+Gramine detected the following insecure configurations:
+
+  - loader.insecure__use_cmdline_argv = true   (forwarding command-line args from untrusted host to the app)
+  - loader.insecure__use_host_env = true       (forwarding environment vars from untrusted host to the app)
+  - loader.insecure__disable_aslr = true       (Address Space Layout Randomization is disabled)
+  - sys.insecure__allow_eventfd = true         (host-based eventfd is enabled)
+  - sys.experimental__enable_flock = true      (flock syscall is enabled; still under development and may contain bugs)
+  - sgx.allowed_files = [ ... ]                (some files are passed through from untrusted host without verification)
+
+Gramine will continue application execution, but this configuration must not be used in production!
+-----------------------------------------------------------------------------------------------------------------------
+
+ERROR: ld.so: object '/home/ubuntu/miniconda3/envs/py310/lib/libstdc++.so.6.0.32' from LD_PRELOAD cannot be preloaded (cannot open shared object file): ignored.
+/home/ubuntu/miniconda3/envs/py310/lib/python3.10/site-packages/torch/cuda/__init__.py:54: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.
+  import pynvml  # type: ignore[import]
+/home/ubuntu/miniconda3/envs/py310/lib/python3.10/site-packages/transformers/utils/generic.py:441: UserWarning: torch.utils._pytree._register_pytree_node is deprecated. Please use torch.utils._pytree.register_pytree_node instead.
+  _torch_pytree._register_pytree_node(
+/home/ubuntu/miniconda3/envs/py310/lib/python3.10/site-packages/transformers/utils/generic.py:309: UserWarning: torch.utils._pytree._register_pytree_node is deprecated. Please use torch.utils._pytree.register_pytree_node instead.
+  _torch_pytree._register_pytree_node(
+/home/ubuntu/miniconda3/envs/py310/lib/python3.10/site-packages/transformers/utils/generic.py:309: UserWarning: torch.utils._pytree._register_pytree_node is deprecated. Please use torch.utils._pytree.register_pytree_node instead.
+  _torch_pytree._register_pytree_node(
+/home/ubuntu/miniconda3/envs/py310/lib/python3.10/site-packages/intel_extension_for_pytorch/nn/utils/_weight_prepack.py:5: UserWarning: pkg_resources is deprecated as an API. See https://setuptools.pypa.io/en/latest/pkg_resources.html. The pkg_resources package is slated for removal as early as 2025-11-30. Refrain from using this package or pin to Setuptools<81.
+  import pkg_resources
+Namespace(model_id='meta-llama/Llama-2-7b-hf', dtype='bfloat16', input_tokens='2048', max_new_tokens=128, prompt=None, config_file=None, greedy=False, ipex=True, deployment_mode=False, torch_compile=False, backend='ipex', profile=False, benchmark=True, num_iter=30, num_warmup=5, batch_size=64, token_latency=True)
+[2026-07-15 08:05:35,531] [INFO] [real_accelerator.py:191:get_accelerator] Setting ds_accelerator to cpu (auto detect)
+/home/ubuntu/miniconda3/envs/py310/lib/python3.10/site-packages/joblib/_multiprocessing_helpers.py:44: UserWarning: [Errno 9] Bad file descriptor.  joblib will operate in serial mode
+  warnings.warn("%s.  joblib will operate in serial mode" % (e,))
+2026-07-15 08:05:42,639 - numexpr.utils - INFO - NumExpr defaulting to 16 threads.
+/home/ubuntu/miniconda3/envs/py310/lib/python3.10/site-packages/huggingface_hub/file_download.py:949: FutureWarning: `resume_download` is deprecated and will be removed in version 1.0.0. Downloads always resume when possible. If you want to force a new download, use `force_download=True`.
+  warnings.warn(
+'(MaxRetryError('HTTPSConnectionPool(host=\'huggingface.co\', port=443): Max retries exceeded with url: /meta-llama/Llama-2-7b-hf/resolve/main/config.json (Caused by NameResolutionError("HTTPSConnection(host=\'huggingface.co\', port=443): Failed to resolve \'huggingface.co\' ([Errno -3] Temporary failure in name resolution)"))'), '(Request ID: ac762c66-16f2-443b-bce9-da60447f1f1b)')' thrown while requesting HEAD https://huggingface.co/meta-llama/Llama-2-7b-hf/resolve/main/config.json
+2026-07-15 08:05:45,642 - huggingface_hub.utils._http - WARNING - '(MaxRetryError('HTTPSConnectionPool(host=\'huggingface.co\', port=443): Max retries exceeded with url: /meta-llama/Llama-2-7b-hf/resolve/main/config.json (Caused by NameResolutionError("HTTPSConnection(host=\'huggingface.co\', port=443): Failed to resolve \'huggingface.co\' ([Errno -3] Temporary failure in name resolution)"))'), '(Request ID: ac762c66-16f2-443b-bce9-da60447f1f1b)')' thrown while requesting HEAD https://huggingface.co/meta-llama/Llama-2-7b-hf/resolve/main/config.json
+Retrying in 1s [Retry 1/5].
+2026-07-15 08:05:45,643 - huggingface_hub.utils._http - WARNING - Retrying in 1s [Retry 1/5].
+'(MaxRetryError('HTTPSConnectionPool(host=\'huggingface.co\', port=443): Max retries exceeded with url: /meta-llama/Llama-2-7b-hf/resolve/main/config.json (Caused by NameResolutionError("HTTPSConnection(host=\'huggingface.co\', port=443): Failed to resolve \'huggingface.co\' ([Errno -3] Temporary failure in name resolution)"))'), '(Request ID: e58a45f1-e564-4662-ad70-f91fc8913f51)')' thrown while requesting HEAD https://huggingface.co/meta-llama/Llama-2-7b-hf/resolve/main/config.json
+2026-07-15 08:05:46,646 - huggingface_hub.utils._http - WARNING - '(MaxRetryError('HTTPSConnectionPool(host=\'huggingface.co\', port=443): Max retries exceeded with url: /meta-llama/Llama-2-7b-hf/resolve/main/config.json (Caused by NameResolutionError("HTTPSConnection(host=\'huggingface.co\', port=443): Failed to resolve \'huggingface.co\' ([Errno -3] Temporary failure in name resolution)"))'), '(Request ID: e58a45f1-e564-4662-ad70-f91fc8913f51)')' thrown while requesting HEAD https://huggingface.co/meta-llama/Llama-2-7b-hf/resolve/main/config.json
+Retrying in 2s [Retry 2/5].
+2026-07-15 08:05:46,646 - huggingface_hub.utils._http - WARNING - Retrying in 2s [Retry 2/5].
+'(MaxRetryError('HTTPSConnectionPool(host=\'huggingface.co\', port=443): Max retries exceeded with url: /meta-llama/Llama-2-7b-hf/resolve/main/config.json (Caused by NameResolutionError("HTTPSConnection(host=\'huggingface.co\', port=443): Failed to resolve \'huggingface.co\' ([Errno -3] Temporary failure in name resolution)"))'), '(Request ID: 88de27a8-919c-469b-92f5-2d3c34f81055)')' thrown while requesting HEAD https://huggingface.co/meta-llama/Llama-2-7b-hf/resolve/main/config.json
+2026-07-15 08:05:48,651 - huggingface_hub.utils._http - WARNING - '(MaxRetryError('HTTPSConnectionPool(host=\'huggingface.co\', port=443): Max retries exceeded with url: /meta-llama/Llama-2-7b-hf/resolve/main/config.json (Caused by NameResolutionError("HTTPSConnection(host=\'huggingface.co\', port=443): Failed to resolve \'huggingface.co\' ([Errno -3] Temporary failure in name resolution)"))'), '(Request ID: 88de27a8-919c-469b-92f5-2d3c34f81055)')' thrown while requesting HEAD https://huggingface.co/meta-llama/Llama-2-7b-hf/resolve/main/config.json
+Retrying in 4s [Retry 3/5].
+2026-07-15 08:05:48,651 - huggingface_hub.utils._http - WARNING - Retrying in 4s [Retry 3/5].
+'(MaxRetryError('HTTPSConnectionPool(host=\'huggingface.co\', port=443): Max retries exceeded with url: /meta-llama/Llama-2-7b-hf/resolve/main/config.json (Caused by NameResolutionError("HTTPSConnection(host=\'huggingface.co\', port=443): Failed to resolve \'huggingface.co\' ([Errno -3] Temporary failure in name resolution)"))'), '(Request ID: 6099ff31-cb74-4d35-bbfb-5fb5ad3a2b40)')' thrown while requesting HEAD https://huggingface.co/meta-llama/Llama-2-7b-hf/resolve/main/config.json
+2026-07-15 08:05:52,657 - huggingface_hub.utils._http - WARNING - '(MaxRetryError('HTTPSConnectionPool(host=\'huggingface.co\', port=443): Max retries exceeded with url: /meta-llama/Llama-2-7b-hf/resolve/main/config.json (Caused by NameResolutionError("HTTPSConnection(host=\'huggingface.co\', port=443): Failed to resolve \'huggingface.co\' ([Errno -3] Temporary failure in name resolution)"))'), '(Request ID: 6099ff31-cb74-4d35-bbfb-5fb5ad3a2b40)')' thrown while requesting HEAD https://huggingface.co/meta-llama/Llama-2-7b-hf/resolve/main/config.json
+Retrying in 8s [Retry 4/5].
+2026-07-15 08:05:52,658 - huggingface_hub.utils._http - WARNING - Retrying in 8s [Retry 4/5].
+'(MaxRetryError('HTTPSConnectionPool(host=\'huggingface.co\', port=443): Max retries exceeded with url: /meta-llama/Llama-2-7b-hf/resolve/main/config.json (Caused by NameResolutionError("HTTPSConnection(host=\'huggingface.co\', port=443): Failed to resolve \'huggingface.co\' ([Errno -3] Temporary failure in name resolution)"))'), '(Request ID: e6784d19-f53d-4c73-842c-0a4354bf2828)')' thrown while requesting HEAD https://huggingface.co/meta-llama/Llama-2-7b-hf/resolve/main/config.json
+2026-07-15 08:06:00,668 - huggingface_hub.utils._http - WARNING - '(MaxRetryError('HTTPSConnectionPool(host=\'huggingface.co\', port=443): Max retries exceeded with url: /meta-llama/Llama-2-7b-hf/resolve/main/config.json (Caused by NameResolutionError("HTTPSConnection(host=\'huggingface.co\', port=443): Failed to resolve \'huggingface.co\' ([Errno -3] Temporary failure in name resolution)"))'), '(Request ID: e6784d19-f53d-4c73-842c-0a4354bf2828)')' thrown while requesting HEAD https://huggingface.co/meta-llama/Llama-2-7b-hf/resolve/main/config.json
+Retrying in 8s [Retry 5/5].
+2026-07-15 08:06:00,668 - huggingface_hub.utils._http - WARNING - Retrying in 8s [Retry 5/5].
+'(MaxRetryError('HTTPSConnectionPool(host=\'huggingface.co\', port=443): Max retries exceeded with url: /meta-llama/Llama-2-7b-hf/resolve/main/config.json (Caused by NameResolutionError("HTTPSConnection(host=\'huggingface.co\', port=443): Failed to resolve \'huggingface.co\' ([Errno -3] Temporary failure in name resolution)"))'), '(Request ID: c65f60bf-7329-458f-89e7-4618f5dbd2d1)')' thrown while requesting HEAD https://huggingface.co/meta-llama/Llama-2-7b-hf/resolve/main/config.json
+2026-07-15 08:06:08,678 - huggingface_hub.utils._http - WARNING - '(MaxRetryError('HTTPSConnectionPool(host=\'huggingface.co\', port=443): Max retries exceeded with url: /meta-llama/Llama-2-7b-hf/resolve/main/config.json (Caused by NameResolutionError("HTTPSConnection(host=\'huggingface.co\', port=443): Failed to resolve \'huggingface.co\' ([Errno -3] Temporary failure in name resolution)"))'), '(Request ID: c65f60bf-7329-458f-89e7-4618f5dbd2d1)')' thrown while requesting HEAD https://huggingface.co/meta-llama/Llama-2-7b-hf/resolve/main/config.json
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [00:44<00:44, 44.56s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:49<00:00, 21.19s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:49<00:00, 24.69s/it]
+'(MaxRetryError('HTTPSConnectionPool(host=\'huggingface.co\', port=443): Max retries exceeded with url: /meta-llama/Llama-2-7b-hf/resolve/main/generation_config.json (Caused by NameResolutionError("HTTPSConnection(host=\'huggingface.co\', port=443): Failed to resolve \'huggingface.co\' ([Errno -3] Temporary failure in name resolution)"))'), '(Request ID: 63505b2e-10b3-4ad8-a289-9f31949f5120)')' thrown while requesting HEAD https://huggingface.co/meta-llama/Llama-2-7b-hf/resolve/main/generation_config.json
+2026-07-15 08:06:59,706 - huggingface_hub.utils._http - WARNING - '(MaxRetryError('HTTPSConnectionPool(host=\'huggingface.co\', port=443): Max retries exceeded with url: /meta-llama/Llama-2-7b-hf/resolve/main/generation_config.json (Caused by NameResolutionError("HTTPSConnection(host=\'huggingface.co\', port=443): Failed to resolve \'huggingface.co\' ([Errno -3] Temporary failure in name resolution)"))'), '(Request ID: 63505b2e-10b3-4ad8-a289-9f31949f5120)')' thrown while requesting HEAD https://huggingface.co/meta-llama/Llama-2-7b-hf/resolve/main/generation_config.json
+Retrying in 1s [Retry 1/5].
+2026-07-15 08:06:59,706 - huggingface_hub.utils._http - WARNING - Retrying in 1s [Retry 1/5].
+'(MaxRetryError('HTTPSConnectionPool(host=\'huggingface.co\', port=443): Max retries exceeded with url: /meta-llama/Llama-2-7b-hf/resolve/main/generation_config.json (Caused by NameResolutionError("HTTPSConnection(host=\'huggingface.co\', port=443): Failed to resolve \'huggingface.co\' ([Errno -3] Temporary failure in name resolution)"))'), '(Request ID: 96c20f91-9523-45ff-96d2-24ad027be718)')' thrown while requesting HEAD https://huggingface.co/meta-llama/Llama-2-7b-hf/resolve/main/generation_config.json
+2026-07-15 08:07:00,709 - huggingface_hub.utils._http - WARNING - '(MaxRetryError('HTTPSConnectionPool(host=\'huggingface.co\', port=443): Max retries exceeded with url: /meta-llama/Llama-2-7b-hf/resolve/main/generation_config.json (Caused by NameResolutionError("HTTPSConnection(host=\'huggingface.co\', port=443): Failed to resolve \'huggingface.co\' ([Errno -3] Temporary failure in name resolution)"))'), '(Request ID: 96c20f91-9523-45ff-96d2-24ad027be718)')' thrown while requesting HEAD https://huggingface.co/meta-llama/Llama-2-7b-hf/resolve/main/generation_config.json
+Retrying in 2s [Retry 2/5].
+2026-07-15 08:07:00,709 - huggingface_hub.utils._http - WARNING - Retrying in 2s [Retry 2/5].
+'(MaxRetryError('HTTPSConnectionPool(host=\'huggingface.co\', port=443): Max retries exceeded with url: /meta-llama/Llama-2-7b-hf/resolve/main/generation_config.json (Caused by NameResolutionError("HTTPSConnection(host=\'huggingface.co\', port=443): Failed to resolve \'huggingface.co\' ([Errno -3] Temporary failure in name resolution)"))'), '(Request ID: c41a2e38-d402-41c8-a5f0-7172206266a3)')' thrown while requesting HEAD https://huggingface.co/meta-llama/Llama-2-7b-hf/resolve/main/generation_config.json
+2026-07-15 08:07:02,714 - huggingface_hub.utils._http - WARNING - '(MaxRetryError('HTTPSConnectionPool(host=\'huggingface.co\', port=443): Max retries exceeded with url: /meta-llama/Llama-2-7b-hf/resolve/main/generation_config.json (Caused by NameResolutionError("HTTPSConnection(host=\'huggingface.co\', port=443): Failed to resolve \'huggingface.co\' ([Errno -3] Temporary failure in name resolution)"))'), '(Request ID: c41a2e38-d402-41c8-a5f0-7172206266a3)')' thrown while requesting HEAD https://huggingface.co/meta-llama/Llama-2-7b-hf/resolve/main/generation_config.json
+Retrying in 4s [Retry 3/5].
+2026-07-15 08:07:02,714 - huggingface_hub.utils._http - WARNING - Retrying in 4s [Retry 3/5].
+'(MaxRetryError('HTTPSConnectionPool(host=\'huggingface.co\', port=443): Max retries exceeded with url: /meta-llama/Llama-2-7b-hf/resolve/main/generation_config.json (Caused by NameResolutionError("HTTPSConnection(host=\'huggingface.co\', port=443): Failed to resolve \'huggingface.co\' ([Errno -3] Temporary failure in name resolution)"))'), '(Request ID: 9b3eb8b2-0c1b-44a6-9bb6-86f105fa9bb9)')' thrown while requesting HEAD https://huggingface.co/meta-llama/Llama-2-7b-hf/resolve/main/generation_config.json
+2026-07-15 08:07:06,721 - huggingface_hub.utils._http - WARNING - '(MaxRetryError('HTTPSConnectionPool(host=\'huggingface.co\', port=443): Max retries exceeded with url: /meta-llama/Llama-2-7b-hf/resolve/main/generation_config.json (Caused by NameResolutionError("HTTPSConnection(host=\'huggingface.co\', port=443): Failed to resolve \'huggingface.co\' ([Errno -3] Temporary failure in name resolution)"))'), '(Request ID: 9b3eb8b2-0c1b-44a6-9bb6-86f105fa9bb9)')' thrown while requesting HEAD https://huggingface.co/meta-llama/Llama-2-7b-hf/resolve/main/generation_config.json
+Retrying in 8s [Retry 4/5].
+2026-07-15 08:07:06,721 - huggingface_hub.utils._http - WARNING - Retrying in 8s [Retry 4/5].
+'(MaxRetryError('HTTPSConnectionPool(host=\'huggingface.co\', port=443): Max retries exceeded with url: /meta-llama/Llama-2-7b-hf/resolve/main/generation_config.json (Caused by NameResolutionError("HTTPSConnection(host=\'huggingface.co\', port=443): Failed to resolve \'huggingface.co\' ([Errno -3] Temporary failure in name resolution)"))'), '(Request ID: 9aec7858-3187-44d4-b875-b5fa8e82d0f7)')' thrown while requesting HEAD https://huggingface.co/meta-llama/Llama-2-7b-hf/resolve/main/generation_config.json
+2026-07-15 08:07:14,731 - huggingface_hub.utils._http - WARNING - '(MaxRetryError('HTTPSConnectionPool(host=\'huggingface.co\', port=443): Max retries exceeded with url: /meta-llama/Llama-2-7b-hf/resolve/main/generation_config.json (Caused by NameResolutionError("HTTPSConnection(host=\'huggingface.co\', port=443): Failed to resolve \'huggingface.co\' ([Errno -3] Temporary failure in name resolution)"))'), '(Request ID: 9aec7858-3187-44d4-b875-b5fa8e82d0f7)')' thrown while requesting HEAD https://huggingface.co/meta-llama/Llama-2-7b-hf/resolve/main/generation_config.json
+Retrying in 8s [Retry 5/5].
+2026-07-15 08:07:14,732 - huggingface_hub.utils._http - WARNING - Retrying in 8s [Retry 5/5].
+'(MaxRetryError('HTTPSConnectionPool(host=\'huggingface.co\', port=443): Max retries exceeded with url: /meta-llama/Llama-2-7b-hf/resolve/main/generation_config.json (Caused by NameResolutionError("HTTPSConnection(host=\'huggingface.co\', port=443): Failed to resolve \'huggingface.co\' ([Errno -3] Temporary failure in name resolution)"))'), '(Request ID: bd92164e-da17-4a99-acc7-88d48b5e4552)')' thrown while requesting HEAD https://huggingface.co/meta-llama/Llama-2-7b-hf/resolve/main/generation_config.json
+2026-07-15 08:07:22,742 - huggingface_hub.utils._http - WARNING - '(MaxRetryError('HTTPSConnectionPool(host=\'huggingface.co\', port=443): Max retries exceeded with url: /meta-llama/Llama-2-7b-hf/resolve/main/generation_config.json (Caused by NameResolutionError("HTTPSConnection(host=\'huggingface.co\', port=443): Failed to resolve \'huggingface.co\' ([Errno -3] Temporary failure in name resolution)"))'), '(Request ID: bd92164e-da17-4a99-acc7-88d48b5e4552)')' thrown while requesting HEAD https://huggingface.co/meta-llama/Llama-2-7b-hf/resolve/main/generation_config.json
+'(MaxRetryError('HTTPSConnectionPool(host=\'huggingface.co\', port=443): Max retries exceeded with url: /meta-llama/Llama-2-7b-hf/resolve/main/tokenizer_config.json (Caused by NameResolutionError("HTTPSConnection(host=\'huggingface.co\', port=443): Failed to resolve \'huggingface.co\' ([Errno -3] Temporary failure in name resolution)"))'), '(Request ID: 81819d55-09c2-4a9f-82d4-97527a841ca8)')' thrown while requesting HEAD https://huggingface.co/meta-llama/Llama-2-7b-hf/resolve/main/tokenizer_config.json
+2026-07-15 08:07:22,746 - huggingface_hub.utils._http - WARNING - '(MaxRetryError('HTTPSConnectionPool(host=\'huggingface.co\', port=443): Max retries exceeded with url: /meta-llama/Llama-2-7b-hf/resolve/main/tokenizer_config.json (Caused by NameResolutionError("HTTPSConnection(host=\'huggingface.co\', port=443): Failed to resolve \'huggingface.co\' ([Errno -3] Temporary failure in name resolution)"))'), '(Request ID: 81819d55-09c2-4a9f-82d4-97527a841ca8)')' thrown while requesting HEAD https://huggingface.co/meta-llama/Llama-2-7b-hf/resolve/main/tokenizer_config.json
+Retrying in 1s [Retry 1/5].
+2026-07-15 08:07:22,746 - huggingface_hub.utils._http - WARNING - Retrying in 1s [Retry 1/5].
+'(MaxRetryError('HTTPSConnectionPool(host=\'huggingface.co\', port=443): Max retries exceeded with url: /meta-llama/Llama-2-7b-hf/resolve/main/tokenizer_config.json (Caused by NameResolutionError("HTTPSConnection(host=\'huggingface.co\', port=443): Failed to resolve \'huggingface.co\' ([Errno -3] Temporary failure in name resolution)"))'), '(Request ID: a37638dd-6356-4b04-a999-b70eaf2901b6)')' thrown while requesting HEAD https://huggingface.co/meta-llama/Llama-2-7b-hf/resolve/main/tokenizer_config.json
+2026-07-15 08:07:23,749 - huggingface_hub.utils._http - WARNING - '(MaxRetryError('HTTPSConnectionPool(host=\'huggingface.co\', port=443): Max retries exceeded with url: /meta-llama/Llama-2-7b-hf/resolve/main/tokenizer_config.json (Caused by NameResolutionError("HTTPSConnection(host=\'huggingface.co\', port=443): Failed to resolve \'huggingface.co\' ([Errno -3] Temporary failure in name resolution)"))'), '(Request ID: a37638dd-6356-4b04-a999-b70eaf2901b6)')' thrown while requesting HEAD https://huggingface.co/meta-llama/Llama-2-7b-hf/resolve/main/tokenizer_config.json
+Retrying in 2s [Retry 2/5].
+2026-07-15 08:07:23,749 - huggingface_hub.utils._http - WARNING - Retrying in 2s [Retry 2/5].
+'(MaxRetryError('HTTPSConnectionPool(host=\'huggingface.co\', port=443): Max retries exceeded with url: /meta-llama/Llama-2-7b-hf/resolve/main/tokenizer_config.json (Caused by NameResolutionError("HTTPSConnection(host=\'huggingface.co\', port=443): Failed to resolve \'huggingface.co\' ([Errno -3] Temporary failure in name resolution)"))'), '(Request ID: b87f5b46-de19-4739-84ef-c6a2eb16000b)')' thrown while requesting HEAD https://huggingface.co/meta-llama/Llama-2-7b-hf/resolve/main/tokenizer_config.json
+2026-07-15 08:07:25,754 - huggingface_hub.utils._http - WARNING - '(MaxRetryError('HTTPSConnectionPool(host=\'huggingface.co\', port=443): Max retries exceeded with url: /meta-llama/Llama-2-7b-hf/resolve/main/tokenizer_config.json (Caused by NameResolutionError("HTTPSConnection(host=\'huggingface.co\', port=443): Failed to resolve \'huggingface.co\' ([Errno -3] Temporary failure in name resolution)"))'), '(Request ID: b87f5b46-de19-4739-84ef-c6a2eb16000b)')' thrown while requesting HEAD https://huggingface.co/meta-llama/Llama-2-7b-hf/resolve/main/tokenizer_config.json
+Retrying in 4s [Retry 3/5].
+2026-07-15 08:07:25,754 - huggingface_hub.utils._http - WARNING - Retrying in 4s [Retry 3/5].
+'(MaxRetryError('HTTPSConnectionPool(host=\'huggingface.co\', port=443): Max retries exceeded with url: /meta-llama/Llama-2-7b-hf/resolve/main/tokenizer_config.json (Caused by NameResolutionError("HTTPSConnection(host=\'huggingface.co\', port=443): Failed to resolve \'huggingface.co\' ([Errno -3] Temporary failure in name resolution)"))'), '(Request ID: 37e3835b-5d23-4752-8529-a51195202dd8)')' thrown while requesting HEAD https://huggingface.co/meta-llama/Llama-2-7b-hf/resolve/main/tokenizer_config.json
+2026-07-15 08:07:29,760 - huggingface_hub.utils._http - WARNING - '(MaxRetryError('HTTPSConnectionPool(host=\'huggingface.co\', port=443): Max retries exceeded with url: /meta-llama/Llama-2-7b-hf/resolve/main/tokenizer_config.json (Caused by NameResolutionError("HTTPSConnection(host=\'huggingface.co\', port=443): Failed to resolve \'huggingface.co\' ([Errno -3] Temporary failure in name resolution)"))'), '(Request ID: 37e3835b-5d23-4752-8529-a51195202dd8)')' thrown while requesting HEAD https://huggingface.co/meta-llama/Llama-2-7b-hf/resolve/main/tokenizer_config.json
+Retrying in 8s [Retry 4/5].
+2026-07-15 08:07:29,760 - huggingface_hub.utils._http - WARNING - Retrying in 8s [Retry 4/5].
+'(MaxRetryError('HTTPSConnectionPool(host=\'huggingface.co\', port=443): Max retries exceeded with url: /meta-llama/Llama-2-7b-hf/resolve/main/tokenizer_config.json (Caused by NameResolutionError("HTTPSConnection(host=\'huggingface.co\', port=443): Failed to resolve \'huggingface.co\' ([Errno -3] Temporary failure in name resolution)"))'), '(Request ID: 1a6b2486-fc7a-4a0f-a787-87ba1e451d98)')' thrown while requesting HEAD https://huggingface.co/meta-llama/Llama-2-7b-hf/resolve/main/tokenizer_config.json
+2026-07-15 08:07:37,771 - huggingface_hub.utils._http - WARNING - '(MaxRetryError('HTTPSConnectionPool(host=\'huggingface.co\', port=443): Max retries exceeded with url: /meta-llama/Llama-2-7b-hf/resolve/main/tokenizer_config.json (Caused by NameResolutionError("HTTPSConnection(host=\'huggingface.co\', port=443): Failed to resolve \'huggingface.co\' ([Errno -3] Temporary failure in name resolution)"))'), '(Request ID: 1a6b2486-fc7a-4a0f-a787-87ba1e451d98)')' thrown while requesting HEAD https://huggingface.co/meta-llama/Llama-2-7b-hf/resolve/main/tokenizer_config.json
+Retrying in 8s [Retry 5/5].
+2026-07-15 08:07:37,771 - huggingface_hub.utils._http - WARNING - Retrying in 8s [Retry 5/5].
+'(MaxRetryError('HTTPSConnectionPool(host=\'huggingface.co\', port=443): Max retries exceeded with url: /meta-llama/Llama-2-7b-hf/resolve/main/tokenizer_config.json (Caused by NameResolutionError("HTTPSConnection(host=\'huggingface.co\', port=443): Failed to resolve \'huggingface.co\' ([Errno -3] Temporary failure in name resolution)"))'), '(Request ID: ae06179a-6763-4cc1-be4f-2f4afdb9a502)')' thrown while requesting HEAD https://huggingface.co/meta-llama/Llama-2-7b-hf/resolve/main/tokenizer_config.json
+2026-07-15 08:07:45,781 - huggingface_hub.utils._http - WARNING - '(MaxRetryError('HTTPSConnectionPool(host=\'huggingface.co\', port=443): Max retries exceeded with url: /meta-llama/Llama-2-7b-hf/resolve/main/tokenizer_config.json (Caused by NameResolutionError("HTTPSConnection(host=\'huggingface.co\', port=443): Failed to resolve \'huggingface.co\' ([Errno -3] Temporary failure in name resolution)"))'), '(Request ID: ae06179a-6763-4cc1-be4f-2f4afdb9a502)')' thrown while requesting HEAD https://huggingface.co/meta-llama/Llama-2-7b-hf/resolve/main/tokenizer_config.json
+/home/ubuntu/miniconda3/envs/py310/lib/python3.10/site-packages/transformers/utils/generic.py:309: UserWarning: torch.utils._pytree._register_pytree_node is deprecated. Please use torch.utils._pytree.register_pytree_node instead.
+  _torch_pytree._register_pytree_node(
+/home/ubuntu/miniconda3/envs/py310/lib/python3.10/site-packages/intel_extension_for_pytorch/frontend.py:462: UserWarning: Conv BatchNorm folding failed during the optimize process.
+  warnings.warn(
+/home/ubuntu/miniconda3/envs/py310/lib/python3.10/site-packages/intel_extension_for_pytorch/frontend.py:469: UserWarning: Linear BatchNorm folding failed during the optimize process.
+  warnings.warn(
+/home/ubuntu/miniconda3/envs/py310/lib/python3.10/site-packages/transformers/generation/configuration_utils.py:381: UserWarning: `do_sample` is set to `False`. However, `temperature` is set to `0.9` -- this flag is only used in sample-based generation modes. You should set `do_sample=True` or unset `temperature`.
+  warnings.warn(
+/home/ubuntu/miniconda3/envs/py310/lib/python3.10/site-packages/transformers/generation/configuration_utils.py:386: UserWarning: `do_sample` is set to `False`. However, `top_p` is set to `0.9` -- this flag is only used in sample-based generation modes. You should set `do_sample=True` or unset `top_p`.
+  warnings.warn(
+/home/ubuntu/miniconda3/envs/py310/lib/python3.10/site-packages/intel_extension_for_pytorch/transformers/models/reference/modules/attentions.py:2043: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach() or sourceTensor.clone().detach().requires_grad_(True), rather than torch.tensor(sourceTensor).
+  else torch.tensor(expanded_attn_mask) + torch.tensor(causal_4d_mask)
+---- Prompt size: 2048
+Traceback (most recent call last):
+  File "/home/ubuntu/llm/single_instance/run_generation.py", line 208, in <module>
+    output = model.generate(input_ids, **generate_kwargs)
+  File "/home/ubuntu/miniconda3/envs/py310/lib/python3.10/site-packages/torch/utils/_contextlib.py", line 115, in decorate_context
+    return func(*args, **kwargs)
+  File "/home/ubuntu/miniconda3/envs/py310/lib/python3.10/site-packages/transformers/generation/utils.py", line 1752, in generate
+    return self.beam_search(
+  File "/home/ubuntu/miniconda3/envs/py310/lib/python3.10/site-packages/intel_extension_for_pytorch/transformers/generation/beam_search.py", line 303, in _beam_search
+    outputs = self(
+  File "/home/ubuntu/miniconda3/envs/py310/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1511, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/ubuntu/miniconda3/envs/py310/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1561, in _call_impl
+    result = forward_call(*args, **kwargs)
+  File "/home/ubuntu/miniconda3/envs/py310/lib/python3.10/site-packages/intel_extension_for_pytorch/transformers/models/reference/models.py", line 108, in LlamaForCausalLM_forward
+    outputs = self.model(
+  File "/home/ubuntu/miniconda3/envs/py310/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1511, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/ubuntu/miniconda3/envs/py310/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1520, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/ubuntu/miniconda3/envs/py310/lib/python3.10/site-packages/transformers/models/llama/modeling_llama.py", line 922, in forward
+    layer_outputs = decoder_layer(
+  File "/home/ubuntu/miniconda3/envs/py310/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1511, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/ubuntu/miniconda3/envs/py310/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1520, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/ubuntu/miniconda3/envs/py310/lib/python3.10/site-packages/intel_extension_for_pytorch/transformers/models/reference/modules/decoder.py", line 874, in forward
+    return LlamaDecoderLayer_forward(
+  File "/home/ubuntu/miniconda3/envs/py310/lib/python3.10/site-packages/intel_extension_for_pytorch/transformers/models/reference/modules/decoder.py", line 29, in LlamaDecoderLayer_forward
+    hidden_states, self_attn_weights, present_key_value = self.self_attn(
+  File "/home/ubuntu/miniconda3/envs/py310/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1511, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/ubuntu/miniconda3/envs/py310/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1520, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/ubuntu/miniconda3/envs/py310/lib/python3.10/site-packages/intel_extension_for_pytorch/transformers/models/reference/modules/attentions.py", line 1598, in forward
+    return _LlamaAttention_forward(
+  File "/home/ubuntu/miniconda3/envs/py310/lib/python3.10/site-packages/intel_extension_for_pytorch/transformers/models/reference/modules/attentions.py", line 183, in _LlamaAttention_forward
+    (attn_output, attn_weights, past_key_value) = self._IPEXScaleDotProduct(
+  File "/home/ubuntu/miniconda3/envs/py310/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1511, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/home/ubuntu/miniconda3/envs/py310/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1520, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/ubuntu/miniconda3/envs/py310/lib/python3.10/site-packages/intel_extension_for_pytorch/transformers/models/cpu/fusions/mha_fusion.py", line 95, in forward
+    ) = torch.ops.torch_ipex.masked_multihead_self_attention(
+  File "/home/ubuntu/miniconda3/envs/py310/lib/python3.10/site-packages/torch/_ops.py", line 755, in __call__
+    return self._op(*args, **(kwargs or {}))
+RuntimeError: [enforce fail at alloc_cpu.cpp:117] err == 0. DefaultCPUAllocator: can't allocate memory: you tried to allocate 4563402752 bytes. Error code 12 (Cannot allocate memory)

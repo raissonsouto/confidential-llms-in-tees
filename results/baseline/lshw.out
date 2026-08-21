@@ -1,0 +1,80 @@
+WARNING: you should run this program as super-user.
+sgx-vm
+    description: Computer
+    width: 64 bits
+    capabilities: smp vsyscall32
+  *-core
+       description: Motherboard
+       physical id: 0
+     *-memory
+          description: System memory
+          physical id: 0
+          size: 128GiB
+     *-cpu
+          product: Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz
+          vendor: Intel Corp.
+          physical id: 1
+          bus info: cpu@0
+          version: 6.106.6
+          size: 2800MHz
+          capacity: 2800MHz
+          width: 64 bits
+          capabilities: fpu fpu_exception wp vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ss ht syscall nx pdpe1gb rdtscp x86-64 constant_tsc rep_good nopl xtopology tsc_reliable nonstop_tsc cpuid aperfmperf tsc_known_freq pni pclmulqdq ssse3 fma cx16 pcid sse4_1 sse4_2 x2apic movbe popcnt tsc_deadline_timer aes xsave avx f16c rdrand hypervisor lahf_lm abm 3dnowprefetch fsgsbase tsc_adjust sgx bmi1 hle avx2 smep bmi2 erms invpcid rtm avx512f avx512dq rdseed adx smap avx512ifma clflushopt clwb avx512cd sha_ni avx512bw avx512vl xsaveopt xsavec xgetbv1 xsaves avx512vbmi umip avx512_vbmi2 gfni vaes vpclmulqdq avx512_vnni avx512_bitalg avx512_vpopcntdq la57 rdpid sgx_lc fsrm arch_capabilities cpufreq
+          configuration: microcode=4294967295
+     *-pnp00:00
+          product: PnP device PNP0501
+          physical id: 2
+          capabilities: pnp
+          configuration: driver=serial
+     *-pnp00:01
+          product: PnP device PNP0501
+          physical id: 3
+          capabilities: pnp
+          configuration: driver=serial
+     *-pnp00:02
+          product: PnP device PNP0b00
+          physical id: 4
+          capabilities: pnp
+          configuration: driver=rtc_cmos
+     *-scsi
+          physical id: 5
+          logical name: scsi0
+        *-cdrom
+             description: SCSI CD-ROM
+             product: Virtual DVD-ROM
+             vendor: Msft
+             physical id: 0.0.2
+             bus info: scsi@0:0.0.2
+             logical name: /dev/cdrom
+             logical name: /dev/sr0
+             version: 1.0
+             capabilities: removable audio
+             configuration: status=nodisc
+  *-graphics
+       product: hyperv_drmdrmfb
+       physical id: 1
+       logical name: /dev/fb0
+       capabilities: fb
+       configuration: depth=32 resolution=1024,768
+  *-input:0
+       product: AT Translated Set 2 keyboard
+       physical id: 2
+       logical name: input0
+       logical name: /dev/input/event0
+       capabilities: i8042
+  *-input:1
+       product: Microsoft Vmbus HID-compliant Mouse
+       physical id: 3
+       logical name: input1
+       logical name: /dev/input/event1
+       logical name: /dev/input/js0
+       logical name: /dev/input/mouse0
+       capabilities: virtual
+  *-network
+       description: Ethernet interface
+       physical id: 4
+       logical name: eth0
+       serial: 7c:1e:52:c2:a7:f5
+       capabilities: ethernet physical
+       configuration: autonegotiation=off broadcast=yes driver=hv_netvsc driverversion=6.17.0-1018-azure duplex=full firmware=N/A ip=10.0.0.4 link=yes multicast=yes
+WARNING: output may be incomplete or inaccurate, you should run this program as super-user.
