@@ -4,7 +4,8 @@
 > the reference implementation for the paper
 > ["Confidential LLM Inference: Performance and Cost Across CPU and GPU TEEs" (arXiv:2509.18886)](https://arxiv.org/abs/2509.18886).
 > This fork reproduces the CPU TEE arms (baseline, SGX, TDX) of that paper on
-> a reduced sweep; see [Prerequisites](#prerequisites) below for the scope.
+> a reduced sweep, and the GPU TEE arm (H100 vs H100 + Intel TDX) on the same
+> reduced grid; see [Prerequisites](#prerequisites) below for the scope.
 
 Repository to include scripts to run inference benchmarks in CC environments.
 
@@ -22,18 +23,41 @@ Repository to include scripts to run inference benchmarks in CC environments.
     - [Running SGX experiments](#running-sgx-experiments)
     - [Processing Results](#processing-results)
       - [Generating figures for this reproduction's dataset](#generating-figures-for-this-reproductions-dataset)
+      - [Statistical analysis (medians, bootstrap CIs, Mann-Whitney U)](#statistical-analysis-medians-bootstrap-cis-mann-whitney-u)
     - [Tracing](#tracing)
+  - [GPUs](#gpus)
+    - [Pre-flight check](#pre-flight-check)
+    - [Provisioning the VMs](#provisioning-the-vms)
+    - [VM setup](#vm-setup)
+    - [Smoke test](#smoke-test)
+    - [Running the GPU sweep](#running-the-gpu-sweep)
+    - [Collecting results](#collecting-results)
+    - [Processing GPU results](#processing-gpu-results)
+    - [GPU caveats](#gpu-caveats)
 
 ## Prerequisites
 
-This reproduction runs the CPU TEE arms only, on two Azure Intel-based
-confidential-computing VMs: `Standard_DC16s_v3` (Ice Lake, DCsv3 family) hosts
-the baseline and SGX arms, and `Standard_DC16es_v6` (Emerald Rapids, DCesv6
-family) hosts the TDX arm. Both run Ubuntu 24.04 LTS. Deploying those VMs is
-covered in [AZURE.md](AZURE.md).
+This reproduction covers the **CPU TEE arms** and the **GPU TEE arm** on the
+same reduced grid: batch size 1 and 64, input length 128, 512 and 2048, 128
+output tokens, Llama-2-7B in bfloat16, with 10 warmup and 30 measured
+iterations per configuration.
+
+The CPU arms run on two Azure Intel-based confidential-computing VMs:
+`Standard_DC16s_v3` (Ice Lake, DCsv3 family) hosts the baseline and SGX arms,
+and `Standard_DC16es_v6` (Emerald Rapids, DCesv6 family) hosts the TDX arm.
+Both run Ubuntu 24.04 LTS. Deploying those VMs is covered in
+[AZURE.md](AZURE.md).
+
+The GPU arms run on two Google Cloud `a3-highgpu-1g` instances (1× NVIDIA H100
+80 GB, Ubuntu 22.04 LTS): one plain, one with Intel TDX and GPU
+confidential-computing mode. Deploying those is covered in
+[GOOGLE_CLOUD.md](GOOGLE_CLOUD.md). Azure is used for the CPU arms and Google
+Cloud for the GPU arms because Azure does not offer a confidential H100 in a
+form comparable to the paper's, whereas Google Cloud does.
 
 For SGX or TDX benchmarks, follow the respective sections on SGX or TDX
-setup below. All benchmarks use Llama2 7B in bfloat16.
+setup below; for the GPU arms, see [GPUs](#gpus). All benchmarks use Llama2 7B
+in bfloat16.
 
 ### Hugging Face access token
 
@@ -221,3 +245,183 @@ Inside run the inference command with `--profile`, e.g.:
 export ATEN_CPU_CAPABILITY=avx512 ONEDNN_MAX_CPU_ISA=AVX512_CORE_BF16 LIBXSMM_TARGET=cpx && cd llm && source ../miniforge3/bin/activate && conda activate py310 && source tools/env_activate.sh && sudo chown -R 1000:1000 ~/.cache && deepspeed --bind_cores_to_rank --num_accelerators 1 --bind_core_list 0-59 distributed/run_generation_with_deepspeed.py --deployment-mode --benchmark -m meta-llama/Llama-2-7b-hf --ipex --dtype bfloat16 --batch-size 64 --num-iter 15 --num-warmup 5 --max-new-tokens 128 --input-tokens 128 --token-latency --greedy --profile
 ```
 This will generate log files which can be processed and plotted by `traces_parser.py`. It accepts two files with traces that correspond to two compared systems.
+
+## GPUs
+
+The GPU arm compares an NVIDIA H100 against the same H100 running under Intel
+TDX with GPU confidential-computing mode enabled, on the same reduced grid as
+the CPU arms: **batch size 1 and 64 × input length 128, 512 and 2048**, 128
+output tokens, Llama-2-7B in bfloat16, 10 warmups and 30 measured iterations
+per configuration. Inference is served by [vLLM](https://github.com/vllm-project/vllm),
+pinned to `v0.9.2`, and driven through its `benchmarks/benchmark_latency.py`.
+
+Both VMs are Google Cloud `a3-highgpu-1g` instances — see
+[GOOGLE_CLOUD.md](GOOGLE_CLOUD.md) for provisioning. Two instances are needed
+because GPU CC mode is fixed at instance creation and cannot be toggled from
+inside the guest, so unlike the Azure SGX VM, one machine cannot host both arms.
+
+> [!IMPORTANT]
+> `a3-highgpu-1g` is offered **only** as a Spot (or flex-start) instance, and
+> Confidential VM with TDX cannot use reservations. Both arms are therefore
+> preemptible, and at roughly $10/hour each. Work through the pre-flight check
+> and the smoke test before starting the full sweep — they exist to move
+> failures off the clock.
+
+### Pre-flight check
+
+Verifies the whole environment before anything bills: required binaries,
+gcloud authentication and project, Compute Engine API, the IAM permissions
+needed to create and delete an instance, H100 spot quota in all three
+supported regions, machine-type and image availability, and — the one most
+likely to bite — that your Hugging Face token actually has access to the gated
+Llama-2 repo.
+
+```sh
+cp config.env .env     # fill in HUGGINGFACE_TOKEN and GCP_PROJECT
+cd GPU
+./preflight.sh
+```
+
+It creates nothing and exits non-zero on the first problem. Don't provision
+until it exits 0.
+
+### Provisioning the VMs
+
+Follow [GOOGLE_CLOUD.md](GOOGLE_CLOUD.md#baseline-gpu-vm). In short, from the
+repo root with `.env` loaded:
+
+```sh
+source .env
+gcloud compute instances create $CGPU_VM_NAME \
+  --zone=$GCP_ZONE --machine-type=$GPU_MACHINE_TYPE \
+  --confidential-compute-type=TDX \
+  --provisioning-model=SPOT --instance-termination-action=STOP \
+  --maintenance-policy=TERMINATE \
+  --image-project=$GPU_IMAGE_PROJECT --image-family=$GPU_IMAGE_FAMILY \
+  --boot-disk-size=$GPU_BOOT_DISK_SIZE --boot-disk-type=pd-balanced
+```
+
+Drop `--confidential-compute-type=TDX` for the baseline VM. Everything else
+about the two instances is identical on purpose, so the TEE is the only
+variable.
+
+### VM setup
+
+Copy the repo across and run the setup script on the instance. It installs the
+NVIDIA driver (580+, required for CC mode), enables the LKCA and persistence
+settings CC mode needs, installs vLLM, downloads the weights, and captures a
+hardware snapshot:
+
+```sh
+gcloud compute scp --recurse --zone=$GCP_ZONE GPU .env \
+  $CGPU_VM_NAME:~/confidential-llms-in-tees/
+gcloud compute ssh $CGPU_VM_NAME --zone=$GCP_ZONE
+
+cd ~/confidential-llms-in-tees/GPU
+./gcp_vm_setup.sh cgpu     # reboots once; reconnect and re-run to finish
+```
+
+Pass `gpu` instead of `cgpu` on the baseline VM — it then skips the CC-mode
+changes and leaves the machine stock, so it stays a clean control.
+
+> [!IMPORTANT]
+> On the confidential VM, confirm the GPU really is in CC mode before
+> measuring anything:
+> ```sh
+> sudo nvidia-smi conf-compute -f     # must print: CC status: ON
+> ```
+> A confidential VM whose GPU came up with `CC status: OFF` yields a second
+> baseline run under a confidential label, and the "overhead" you report is
+> noise around zero. `gcp_vm_setup.sh` refuses to continue in that case.
+
+### Smoke test
+
+One configuration — **batch 64, input 2048** — on the confidential VM. That is
+the worst case for GPU memory in the whole grid, so if it passes the rest will:
+
+```sh
+source ~/.venv/bin/activate
+./benchmark_vllm.sh cgpu --smoke
+```
+
+Check that the resulting `latency_in2048_bs64.json` has 30 entries in
+`latencies`, that there was no OOM, and note the `GPU KV cache size` /
+`Maximum concurrency` lines the script extracts (see
+[GPU caveats](#gpu-caveats)):
+
+```sh
+jq '.latencies | length' results_cgpu_*/latency_in2048_bs64.json
+cat results_cgpu_*/latency_in2048_bs64.log.kv
+```
+
+### Running the GPU sweep
+
+Same VM, all six configurations. The smoke test's JSON is already present, so
+it is skipped rather than re-run:
+
+```sh
+source ~/.venv/bin/activate
+RESULTS_DIR=results_cgpu_<timestamp> nohup ./benchmark_vllm.sh cgpu > sweep-cgpu.log 2>&1 &
+```
+
+Then repeat on the baseline VM with `./benchmark_vllm.sh gpu`.
+
+`nohup` keeps the sweep alive across SSH drops. The sweep is also **resumable**:
+each configuration whose `.json` already exists is skipped, so a Spot
+preemption costs the configuration in flight and nothing else. Restart the
+stopped instance and re-run the same command with the same `RESULTS_DIR`.
+
+### Collecting results
+
+Copy each arm's results down as soon as it finishes — a deleted instance takes
+its boot disk with it:
+
+```sh
+gcloud compute scp --recurse --zone=$GCP_ZONE \
+  $CGPU_VM_NAME:~/confidential-llms-in-tees/GPU/results_cgpu_\* ./results/cgpu/
+gcloud compute scp --recurse --zone=$GCP_ZONE \
+  $CGPU_VM_NAME:~/confidential-llms-in-tees/GPU/hwinfo-cgpu ./results/cgpu/
+```
+
+Then delete the instances (see
+[Cleaning up](GOOGLE_CLOUD.md#cleaning-up)).
+
+### Processing GPU results
+
+Unlike the CPU track, GPU results are **not** folded into
+`results/results.csv` — vLLM emits its own per-configuration JSON, and the two
+tracks measure different systems on different clouds. They are processed by
+their own scripts, run from `GPU/`:
+
+```sh
+cd GPU
+python3 parse.py      ../results/gpu ../results/cgpu   # latency, throughput, $/Mtok, overhead
+python3 plot_GPUs.py  ../results/gpu ../results/cgpu   # throughput comparison figure
+```
+
+`parse.py` prices both arms at the `a3-highgpu-1g` spot rate; override it for a
+specific run with `GPU_COST_PER_HOUR=<usd> python3 parse.py ...`. `plot_GPUs.py`
+writes `results/gpu_throughput_comparison.png`: throughput vs batch size at a
+fixed input length, and vs input length at a fixed batch size, with each
+confidential bar annotated with its overhead against the baseline.
+
+### GPU caveats
+
+- **Batch 64 at input 2048 may not be a true batch of 64.** Llama-2-7B uses
+  multi-head attention, so its KV cache costs about 0.5 MB per token: batch 64
+  × (2048 + 128) tokens needs roughly 68 GB, on top of about 13.5 GB of
+  weights. That does not fit an 80 GB H100 at vLLM's default
+  `gpu-memory-utilization` of 0.9. The sweep runs with `0.95` and
+  `--max-model-len 2176` to recover as much KV cache as possible, and records
+  vLLM's own `GPU KV cache size` and `Maximum concurrency` lines for each
+  configuration in `<log>.kv`. If the reported concurrency is below 64, that
+  cell measures wave-scheduled throughput rather than a single batch of 64 and
+  should be reported as such.
+- **Both arms are Spot instances.** This is forced by the platform, not chosen.
+  It makes the two arms symmetric, but it also means neither arm has a
+  guaranteed-uninterrupted host, and run-to-run variance may be higher than on
+  dedicated hardware.
+- **Ubuntu 22.04, not 24.04.** The GPU arms run 22.04 because that is the only
+  Ubuntu image Google supports for Confidential VM with GPU; the CPU arms run
+  24.04. Compare TEE-vs-baseline ratios within a track rather than absolute
+  numbers across tracks.
