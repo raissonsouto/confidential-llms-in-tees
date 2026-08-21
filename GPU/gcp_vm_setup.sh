@@ -142,7 +142,13 @@ if ! done_with vllm; then
     # shellcheck disable=SC1091
     source "$HOME/.venv/bin/activate"
     pip install -U pip
-    pip install "vllm==${VLLM_VERSION}" "huggingface_hub[cli]"
+    # vLLM 0.9.2 declares only transformers>=4.51.1, so a fresh install resolves
+    # to a far newer major that breaks it: transformers >= 4.54 registers an
+    # "aimv2" config itself, and vLLM's own registration then dies with
+    # "'aimv2' is already used by a Transformers config". Pin a contemporaneous
+    # release instead of taking whatever pip resolves to.
+    TRANSFORMERS_VERSION="${TRANSFORMERS_VERSION:-4.53.2}"
+    pip install "vllm==${VLLM_VERSION}" "transformers==${TRANSFORMERS_VERSION}" "huggingface_hub[cli]"
 
     # The pip wheel does not ship benchmarks/, which is what benchmark_vllm.sh
     # invokes, so the matching tag is cloned separately.
