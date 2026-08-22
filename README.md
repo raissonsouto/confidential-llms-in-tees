@@ -4,36 +4,55 @@
 > the reference implementation for the paper
 > ["Confidential LLM Inference: Performance and Cost Across CPU and GPU TEEs" (arXiv:2509.18886)](https://arxiv.org/abs/2509.18886).
 > This fork reproduces the CPU TEE arms (baseline, SGX, TDX) of that paper on
-> a reduced sweep; see [Prerequisites](#prerequisites) below for the scope.
+> a reduced sweep, and the GPU TEE arm (H100 vs H100 + Intel TDX) on the same
+> reduced grid; see [Prerequisites](#prerequisites) below for the scope.
 
 Repository to include scripts to run inference benchmarks in CC environments.
 
 ## Table of contents
 
-- [Confidential LLM inference benchmarking in CC](#confidential-llm-inference-benchmarking-in-cc)
-  - [Table of contents](#table-of-contents)
-  - [Prerequisites](#prerequisites)
-    - [Hugging Face access token](#hugging-face-access-token)
-  - [CPUs](#cpus)
-    - [Common Setup](#common-setup)
-    - [SGX Setup](#sgx-setup)
-    - [Running baseline experiments](#running-baseline-experiments)
-    - [Running TDX experiments](#running-tdx-experiments)
-    - [Running SGX experiments](#running-sgx-experiments)
-    - [Processing Results](#processing-results)
-      - [Generating figures for this reproduction's dataset](#generating-figures-for-this-reproductions-dataset)
-    - [Tracing](#tracing)
+- [Prerequisites](#prerequisites)
+  - [Hugging Face access token](#hugging-face-access-token)
+- [CPUs](#cpus)
+  - [Common Setup](#common-setup)
+  - [SGX Setup](#sgx-setup)
+  - [Running baseline experiments](#running-baseline-experiments)
+  - [Running TDX experiments](#running-tdx-experiments)
+  - [Running SGX experiments](#running-sgx-experiments)
+  - [Processing Results](#processing-results)
+    - [Generating figures for this reproduction's dataset](#generating-figures-for-this-reproductions-dataset)
+    - [Statistical analysis (medians, bootstrap CIs, Mann-Whitney U)](#statistical-analysis-medians-bootstrap-cis-mann-whitney-u)
+  - [Tracing](#tracing)
+- [GPUs](#gpus)
+  - [VM setup](#vm-setup)
+  - [Smoke test](#smoke-test)
+  - [Running the GPU sweep](#running-the-gpu-sweep)
+  - [Collecting results](#collecting-results)
+  - [Processing GPU results](#processing-gpu-results)
 
 ## Prerequisites
 
-This reproduction runs the CPU TEE arms only, on two Azure Intel-based
-confidential-computing VMs: `Standard_DC16s_v3` (Ice Lake, DCsv3 family) hosts
-the baseline and SGX arms, and `Standard_DC16es_v6` (Emerald Rapids, DCesv6
-family) hosts the TDX arm. Both run Ubuntu 24.04 LTS. Deploying those VMs is
-covered in [AZURE.md](AZURE.md).
+This reproduction covers the **CPU TEE arms** and the **GPU TEE arm** on the
+same reduced grid: batch size 1 and 64, input length 128, 512 and 2048, 128
+output tokens, Llama-2-7B in bfloat16, with 10 warmup and 30 measured
+iterations per configuration.
+
+The CPU arms run on two Azure Intel-based confidential-computing VMs:
+`Standard_DC16s_v3` (Ice Lake, DCsv3 family) hosts the baseline and SGX arms,
+and `Standard_DC16es_v6` (Emerald Rapids, DCesv6 family) hosts the TDX arm.
+Both run Ubuntu 24.04 LTS. Deploying those VMs is covered in
+[AZURE.md](AZURE.md).
+
+The GPU arms run on two Google Cloud `a3-highgpu-1g` instances (1× NVIDIA H100
+80 GB, Ubuntu 22.04 LTS): one plain, one with Intel TDX and GPU
+confidential-computing mode. Deploying those is covered in
+[GOOGLE_CLOUD.md](GOOGLE_CLOUD.md). Azure is used for the CPU arms and Google
+Cloud for the GPU arms because Azure does not offer a confidential H100 in a
+form comparable to the paper's, whereas Google Cloud does.
 
 For SGX or TDX benchmarks, follow the respective sections on SGX or TDX
-setup below. All benchmarks use Llama2 7B in bfloat16.
+setup below; for the GPU arms, see [GPUs](#gpus). All benchmarks use Llama2 7B
+in bfloat16.
 
 ### Hugging Face access token
 
@@ -221,3 +240,140 @@ Inside run the inference command with `--profile`, e.g.:
 export ATEN_CPU_CAPABILITY=avx512 ONEDNN_MAX_CPU_ISA=AVX512_CORE_BF16 LIBXSMM_TARGET=cpx && cd llm && source ../miniforge3/bin/activate && conda activate py310 && source tools/env_activate.sh && sudo chown -R 1000:1000 ~/.cache && deepspeed --bind_cores_to_rank --num_accelerators 1 --bind_core_list 0-59 distributed/run_generation_with_deepspeed.py --deployment-mode --benchmark -m meta-llama/Llama-2-7b-hf --ipex --dtype bfloat16 --batch-size 64 --num-iter 15 --num-warmup 5 --max-new-tokens 128 --input-tokens 128 --token-latency --greedy --profile
 ```
 This will generate log files which can be processed and plotted by `traces_parser.py`. It accepts two files with traces that correspond to two compared systems.
+
+## GPUs
+
+The GPU arm compares an NVIDIA H100 against the same H100 running under Intel
+TDX with GPU confidential-computing mode enabled, on the same reduced grid as
+the CPU arms: **batch size 1 and 64 × input length 128, 512 and 2048**, 128
+output tokens, Llama-2-7B in bfloat16, 10 warmups and 30 measured iterations
+per configuration. Inference is served by [vLLM](https://github.com/vllm-project/vllm),
+pinned to `v0.9.2`, and driven through its `benchmarks/benchmark_latency.py`.
+
+Both VMs are Google Cloud `a3-highgpu-1g` instances. Two instances are needed
+because GPU CC mode is fixed at instance creation and cannot be toggled from
+inside the guest, so unlike the Azure SGX VM, one machine cannot host both arms.
+
+> [!IMPORTANT]
+> **Start with [GOOGLE_CLOUD.md](GOOGLE_CLOUD.md).** It covers the pre-flight
+> check, quota, and creating both VMs. This section picks up from there and
+> assumes the instance already exists and the pre-flight passed.
+
+`a3-highgpu-1g` is offered only as a Spot (or flex-start) instance, and
+Confidential VM with TDX cannot use reservations, so both arms are preemptible
+at roughly $10/hour each. Run the smoke test before the full sweep — it exists
+to move failures off the clock.
+
+### VM setup
+
+Starting point: the instance exists and
+[GOOGLE_CLOUD.md](GOOGLE_CLOUD.md#pre-flight-check)'s pre-flight passed.
+
+Copy the repo across and run the setup script on the instance. It installs the
+NVIDIA driver (580+, required for CC mode), enables the LKCA and persistence
+settings CC mode needs, installs vLLM (pinned, with a matching `transformers`),
+downloads the weights, verifies CUDA can initialise, and captures a hardware
+snapshot:
+
+```sh
+source .env      # GCP_ZONE, CGPU_VM_NAME, GPU_VM_NAME
+
+gcloud compute scp --recurse --zone=$GCP_ZONE GPU .env \
+  $CGPU_VM_NAME:~/confidential-llms-in-tees/
+gcloud compute ssh $CGPU_VM_NAME --zone=$GCP_ZONE
+
+cd ~/confidential-llms-in-tees/GPU
+./gcp_vm_setup.sh cgpu     # reboots once; reconnect and re-run to finish
+```
+
+The script is resumable and reboots when it has to, so re-running it after each
+reboot is the normal path, not a workaround.
+
+Pass `gpu` instead of `cgpu` on the baseline VM — it then skips the CC-mode
+changes and leaves the machine stock, so it stays a clean control.
+
+> [!IMPORTANT]
+> On the confidential VM, confirm the GPU really is in CC mode before
+> measuring anything:
+> ```sh
+> sudo nvidia-smi conf-compute -f     # must print: CC status: ON
+> ```
+> A confidential VM whose GPU came up with `CC status: OFF` yields a second
+> baseline run under a confidential label, and the "overhead" you report is
+> noise around zero. `gcp_vm_setup.sh` refuses to continue in that case.
+
+### Smoke test
+
+One configuration — **batch 1, input 128** — on the confidential VM. This is the
+smallest cell in the grid, and the smoke test's job is to prove the pipeline
+works end to end (driver, CC mode, vLLM, weights, JSON output) for the least
+GPU time possible:
+
+```sh
+source ~/.venv/bin/activate
+./benchmark_vllm.sh cgpu --smoke
+```
+
+Check that the resulting `latency_in128_bs1.json` has 30 entries in
+`latencies`, and note the `GPU KV cache size` / `Maximum concurrency` lines
+the script extracts:
+
+```sh
+jq '.latencies | length' results_cgpu_*/latency_in128_bs1.json
+cat results_cgpu_*/latency_in128_bs1.log.kv
+```
+
+The heaviest cell, batch 64 at input 2048, is deliberately *not* the smoke
+test: whether it fits in 80 GB is one of the things the sweep is measuring, so
+it belongs in the run rather than in the gate that precedes it.
+
+### Running the GPU sweep
+
+Same VM, all six configurations. The smoke test's JSON is already present, so
+it is skipped rather than re-run:
+
+```sh
+source ~/.venv/bin/activate
+RESULTS_DIR=results_cgpu_<timestamp> nohup ./benchmark_vllm.sh cgpu > sweep-cgpu.log 2>&1 &
+```
+
+Then repeat on the baseline VM with `./benchmark_vllm.sh gpu`.
+
+`nohup` keeps the sweep alive across SSH drops. The sweep is also **resumable**:
+each configuration whose `.json` already exists is skipped, so a Spot
+preemption costs the configuration in flight and nothing else. Restart the
+stopped instance and re-run the same command with the same `RESULTS_DIR`.
+
+### Collecting results
+
+Copy each arm's results down as soon as it finishes — a deleted instance takes
+its boot disk with it:
+
+```sh
+gcloud compute scp --recurse --zone=$GCP_ZONE \
+  $CGPU_VM_NAME:~/confidential-llms-in-tees/GPU/results_cgpu_\* ./results/cgpu/
+gcloud compute scp --recurse --zone=$GCP_ZONE \
+  $CGPU_VM_NAME:~/confidential-llms-in-tees/GPU/hwinfo-cgpu ./results/cgpu/
+```
+
+Then delete the instances (see
+[Cleaning up](GOOGLE_CLOUD.md#cleaning-up)).
+
+### Processing GPU results
+
+Unlike the CPU track, GPU results are **not** folded into
+`results/results.csv` — vLLM emits its own per-configuration JSON, and the two
+tracks measure different systems on different clouds. They are processed by
+their own scripts, run from `GPU/`:
+
+```sh
+cd GPU
+python3 parse.py      ../results/gpu ../results/cgpu   # latency, throughput, $/Mtok, overhead
+python3 plot_GPUs.py  ../results/gpu ../results/cgpu   # throughput comparison figure
+```
+
+`parse.py` prices both arms at the `a3-highgpu-1g` spot rate; override it for a
+specific run with `GPU_COST_PER_HOUR=<usd> python3 parse.py ...`. `plot_GPUs.py`
+writes `results/gpu_throughput_comparison.png`: throughput vs batch size at a
+fixed input length, and vs input length at a fixed batch size, with each
+confidential bar annotated with its overhead against the baseline.

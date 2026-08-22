@@ -1,0 +1,40 @@
+
+gpu  ($10.094/hour)
+   input  batch  latency(s)      tok/s     $/Mtok
+     128      1       0.912      140.3     19.984
+     128     64       1.821     4499.3      0.623
+     512      1       0.911      140.5     19.953
+     512     64       2.901     2823.6      0.993
+    2048      1       0.982      130.4     21.503
+    2048     64       8.507      963.0      2.912
+
+cgpu  ($10.094/hour)
+   input  batch  latency(s)      tok/s     $/Mtok
+     128      1       0.969      132.0     21.235
+     128     64       1.883     4350.2      0.645
+     512      1       0.967      132.4     21.178
+     512     64       2.946     2780.8      1.008
+    2048      1       1.035      123.7     22.666
+    2048     64       8.679      943.9      2.971
+
+Confidential GPU overhead (throughput loss vs baseline)
+   input  batch   gpu tok/s  cgpu tok/s   overhead
+     128      1       140.3       132.0    -5.89%
+     128     64      4499.3      4350.2    -3.31%
+     512      1       140.5       132.4    -5.79%
+     512     64      2823.6      2780.8    -1.52%
+    2048      1       130.4       123.7    -5.13%
+    2048     64       963.0       943.9    -1.98%
+
+Hardware / software (identical on both arms except the TEE):
+  NVIDIA H100 80GB HBM3, driver 580.178.04
+  a3-highgpu-1g (26 vCPU, 234 GB), Spot, europe-west4-c, Ubuntu 22.04.5 LTS
+  vLLM 0.9.2, torch 2.7.0+cu126, transformers 4.53.2
+  cgpu: Intel TDX guest, nvidia-smi conf-compute -f => CC status: ON
+  gpu:  no TDX, CC status: OFF
+  10 warmup + 30 measured iterations per configuration
+  --gpu-memory-utilization 0.95 --max-model-len 2176
+
+vLLM reported "Maximum concurrency for 2176 tokens per request: 58.10x" on both
+arms, i.e. below the requested batch of 64: the batch-64 configurations run
+wave-scheduled rather than as a single batch of 64. See README, "GPU caveats".

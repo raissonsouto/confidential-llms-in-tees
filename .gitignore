@@ -3,3 +3,6 @@ models/
 experiment.log
 nohup.out
 .env
+__pycache__/
+/GPU/results_*
+/GPU/hwinfo-*
